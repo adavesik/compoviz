@@ -568,6 +568,7 @@ export default function App() {
   const [yamlCode, setYamlCode] = useState('');
   const [errors, setErrors] = useState([]);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Load from localStorage
   useEffect(() => {
@@ -664,10 +665,58 @@ export default function App() {
 
   const renderEditor = () => {
     if (!selected) return (
-      <div className="h-full flex flex-col items-center justify-center text-cyber-text-muted">
-        <Layers size={48} className="mb-4 opacity-50" />
-        <p className="text-lg mb-2">Select a resource to edit</p>
-        <p className="text-sm">Or add a new service, network, or volume</p>
+      <div
+        className={`h-full flex flex-col items-center justify-center text-cyber-text-muted border-2 border-dashed rounded-xl transition-all duration-300 m-4 ${isDragging ? 'border-cyber-accent bg-cyber-accent/5' : 'border-transparent'}`}
+        onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={e => { e.preventDefault(); setIsDragging(false); }}
+        onDrop={e => {
+          e.preventDefault();
+          setIsDragging(false);
+          const file = e.dataTransfer.files[0];
+          if (file && (file.name.endsWith('.yml') || file.name.endsWith('.yaml'))) {
+            const reader = new FileReader();
+            reader.onload = (e) => handleImport(e.target?.result);
+            reader.readAsText(file);
+          }
+        }}
+      >
+        <Layers size={48} className={`mb-4 transition-all duration-300 ${isDragging ? 'text-cyber-accent scale-110' : 'opacity-50'}`} />
+        <p className="text-lg mb-2 font-medium">Select a resource to edit</p>
+        <p className="text-sm mb-8">Or add a new service, network, or volume</p>
+
+        <div className="flex flex-col items-center gap-4 animate-fade-in">
+          <div className={`p-6 rounded-xl glass transition-all duration-300 ${isDragging ? 'border-cyber-accent shadow-glow' : 'border border-cyber-border/30'}`}>
+            <div className="flex flex-col items-center gap-2 pointer-events-none">
+              <Upload size={32} className={`transition-colors duration-300 ${isDragging ? 'text-cyber-accent animate-bounce' : 'text-cyber-text-muted'}`} />
+              <p className="text-sm font-medium">Drag & drop docker-compose.yml</p>
+              <span className="text-xs text-cyber-text-muted">Supports .yml and .yaml</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 w-full">
+            <div className="h-px bg-cyber-border/50 flex-1"></div>
+            <span className="text-xs text-cyber-text-muted uppercase tracking-wider">or</span>
+            <div className="h-px bg-cyber-border/50 flex-1"></div>
+          </div>
+
+          <label className="btn btn-secondary cursor-pointer gap-2 flex items-center px-6 hover:bg-cyber-surface-light transition-all">
+            <Upload size={16} />
+            <span>Import File</span>
+            <input
+              type="file"
+              accept=".yml,.yaml"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (e) => handleImport(e.target?.result);
+                  reader.readAsText(file);
+                }
+              }}
+            />
+          </label>
+        </div>
       </div>
     );
 
