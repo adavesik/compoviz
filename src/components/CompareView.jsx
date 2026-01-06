@@ -180,6 +180,37 @@ export default function CompareView() {
 
     const fileInputRef = useRef(null);
     const [comparisonResults, setComparisonResults] = useState([]);
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
+    const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.yml') || f.name.endsWith('.yaml'));
+
+        if (files.length === 0) return;
+
+        const canAdd = 3 - projects.length;
+        if (canAdd <= 0) {
+            alert('Maximum of 3 projects allowed. Please remove a project first.');
+            return;
+        }
+
+        const filesToProcess = files.slice(0, canAdd);
+
+        filesToProcess.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const result = addProject(event.target?.result, file.name);
+                if (!result.success) {
+                    alert(`Failed to parse ${file.name}: ${result.error}`);
+                }
+            };
+            reader.readAsText(file);
+        });
+    };
 
     // Run comparison whenever projects change
     useEffect(() => {
@@ -271,19 +302,31 @@ export default function CompareView() {
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden">
                 {projects.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center text-cyber-text-muted">
-                        <div className="text-center">
-                            <Upload size={48} className="mx-auto mb-4 opacity-50" />
-                            <p className="text-lg mb-2">Load docker-compose files to compare</p>
+                    <div
+                        className={`flex-1 flex flex-col items-center justify-center text-cyber-text-muted transition-all duration-300 m-4 border-2 border-dashed rounded-xl ${isDragging ? 'border-cyber-accent bg-cyber-accent/5' : 'border-transparent'}`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        <div className={`text-center transition-all duration-300 ${isDragging ? 'scale-110' : ''}`}>
+                            <Upload size={48} className={`mx-auto mb-4 ${isDragging ? 'text-cyber-accent animate-bounce' : 'opacity-50'}`} />
+                            <p className="text-lg mb-2 font-medium">Load docker-compose files to compare</p>
                             <p className="text-sm">Upload at least 2 files to see conflicts and shared resources</p>
+                            <p className="text-xs mt-4 text-cyber-text-muted">Drag & drop up to 3 files here</p>
                         </div>
                     </div>
                 ) : projects.length === 1 ? (
-                    <div className="flex-1 flex items-center justify-center text-cyber-text-muted">
-                        <div className="text-center">
-                            <AlertCircle size={48} className="mx-auto mb-4 opacity-50" />
-                            <p className="text-lg mb-2">Load one more project</p>
+                    <div
+                        className={`flex-1 flex flex-col items-center justify-center text-cyber-text-muted transition-all duration-300 m-4 border-2 border-dashed rounded-xl ${isDragging ? 'border-cyber-accent bg-cyber-accent/5' : 'border-transparent'}`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        <div className={`text-center transition-all duration-300 ${isDragging ? 'scale-110' : ''}`}>
+                            <AlertCircle size={48} className={`mx-auto mb-4 ${isDragging ? 'text-cyber-accent animate-bounce' : 'opacity-50'}`} />
+                            <p className="text-lg mb-2 font-medium">Load one more project</p>
                             <p className="text-sm">Need at least 2 projects to compare</p>
+                            <p className="text-xs mt-4 text-cyber-text-muted">Drag & drop another file here</p>
                         </div>
                     </div>
                 ) : (
