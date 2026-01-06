@@ -47,7 +47,7 @@
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/compoviz.git
+   git clone https://github.com/adavesik/compoviz.git
    cd compoviz
    ```
 
@@ -73,7 +73,7 @@ The easiest way to run Compoviz is with Docker. No Node.js required!
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/compoviz.git
+git clone https://github.com/adavesik/compoviz.git
 cd compoviz
 
 # Build and run
@@ -97,7 +97,7 @@ docker run -d -p 8080:80 --name compoviz compoviz
 ### Using Pre-built Image (Coming Soon)
 
 ```bash
-docker run -d -p 8080:80 ghcr.io/yourusername/compoviz:latest
+docker run -d -p 8080:80 ghcr.io/adavesik/compoviz:latest
 ```
 
 ---
