@@ -57,12 +57,128 @@ const IconButton = ({ icon: Icon, onClick, title, variant = 'default', size = 'm
   </button>
 );
 
-const Input = ({ label, value, onChange, placeholder, tooltip }) => (
+// Issues Panel for sidebar - shows expandable validation issues
+const IssuesPanel = ({ errors, onSelect }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  if (errors.length === 0) return null;
+
+  const errorCount = errors.filter(e => e.type === 'error').length;
+  const warningCount = errors.filter(e => e.type === 'warning').length;
+
+  return (
+    <div className="p-3 border-t border-cyber-border/50">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between text-sm text-cyber-warning hover:text-cyber-warning/80 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <AlertCircle size={14} />
+          <span>{errors.length} issue{errors.length !== 1 && 's'} found</span>
+        </div>
+        <span className="text-xs text-cyber-accent">{expanded ? '▲' : '▼'}</span>
+      </button>
+
+      {expanded && (
+        <div className="mt-3 space-y-2 max-h-48 overflow-auto animate-fade-in">
+          {errors.map((error, idx) => (
+            <div
+              key={idx}
+              onClick={() => onSelect({ type: error.entity + 's', name: error.name })}
+              className={`p-2 rounded-lg border cursor-pointer transition-all hover:brightness-110 ${error.type === 'error'
+                ? 'bg-cyber-error/10 border-cyber-error/30'
+                : 'bg-cyber-warning/10 border-cyber-warning/30'
+                }`}
+            >
+              <div className="flex items-start gap-2">
+                {error.type === 'error' ? (
+                  <AlertCircle size={12} className="text-cyber-error mt-0.5" />
+                ) : (
+                  <AlertCircle size={12} className="text-cyber-warning mt-0.5" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{error.message}</p>
+                  <p className="text-xs text-cyber-text-muted mt-0.5">
+                    {error.entity}: <span className="text-cyber-accent">{error.name}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Error help content - provides context and solutions for each error type
+const ERROR_HELP = {
+  'Missing image or build context': {
+    explanation: 'Every Docker service needs either a pre-built image from a registry or a build context to create one.',
+    solution: 'Add an image name (e.g., "nginx:latest") OR specify a build context path (e.g., "./app").',
+  },
+  'Network .* not defined': {
+    explanation: 'This service references a network that doesn\'t exist in your compose file.',
+    solution: 'Create the missing network in the Networks section, or remove this network reference.',
+  },
+  'Dependency .* not found': {
+    explanation: 'This service depends on another service that doesn\'t exist.',
+    solution: 'Create the missing service, or remove this dependency.',
+  },
+  'Volume .* not defined': {
+    explanation: 'This service uses a named volume that isn\'t declared in the volumes section.',
+    solution: 'Add the volume to the Volumes section, or use a bind mount path instead.',
+  },
+  'Port .* already used': {
+    explanation: 'Multiple services are trying to bind to the same host port, which will cause a conflict.',
+    solution: 'Change one of the services to use a different host port (the number before the colon).',
+  },
+  'Duplicate container_name': {
+    explanation: 'Container names must be unique. Two services have the same container_name.',
+    solution: 'Change the container_name to be unique, or remove it to use auto-generated names.',
+  },
+};
+
+// Get help content for an error message
+const getErrorHelp = (message) => {
+  for (const [pattern, help] of Object.entries(ERROR_HELP)) {
+    if (new RegExp(pattern, 'i').test(message)) {
+      return help;
+    }
+  }
+  return { explanation: 'This configuration may cause issues.', solution: 'Review and correct the value.' };
+};
+
+// Enhanced Input with error state
+const Input = ({ label, value, onChange, placeholder, tooltip, error }) => (
   <div className="space-y-1">
-    <label className="text-xs text-cyber-text-muted flex items-center gap-1">{label}
+    <label className={`text-xs flex items-center gap-1 ${error ? 'text-cyber-error' : 'text-cyber-text-muted'}`}>
+      {error && <AlertCircle size={12} className="text-cyber-error" />}
+      {label}
       {tooltip && <span className="tooltip" data-tooltip={tooltip}><AlertCircle size={12} /></span>}
     </label>
-    <input type="text" value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full" />
+    <input
+      type="text"
+      value={value || ''}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`w-full ${error ? 'border-cyber-error ring-2 ring-cyber-error/30 bg-cyber-error/5' : ''}`}
+    />
+    {error && (
+      <div className="mt-2 p-3 rounded-lg border border-cyber-error/40 bg-cyber-error/10 animate-fade-in">
+        <div className="flex items-start gap-2">
+          <AlertCircle size={16} className="text-cyber-error mt-0.5 flex-shrink-0" />
+          <div className="flex-1 space-y-2 text-sm">
+            <p className="font-medium text-cyber-error">{error.message}</p>
+            <p className="text-cyber-text-muted text-xs">{getErrorHelp(error.message).explanation}</p>
+            <div className="flex items-start gap-2 p-2 bg-cyber-success/10 rounded border border-cyber-success/30">
+              <CheckCircle size={14} className="text-cyber-success mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-cyber-success">{getErrorHelp(error.message).solution}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
   </div>
 );
 
@@ -124,22 +240,46 @@ const KeyValueEditor = ({ label, value = {}, onChange, keyPlaceholder = 'Key', v
   );
 };
 
-const ArrayEditor = ({ label, value = [], onChange, placeholder = 'Value' }) => {
+const ArrayEditor = ({ label, value = [], onChange, placeholder = 'Value', error }) => {
   const addItem = () => onChange([...value, '']);
   const updateItem = (i, v) => { const n = [...value]; n[i] = v; onChange(n); };
   const removeItem = (i) => onChange(value.filter((_, idx) => idx !== i));
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between"><label className="text-xs text-cyber-text-muted">{label}</label>
+      <div className="flex items-center justify-between">
+        <label className={`text-xs ${error ? 'text-cyber-error flex items-center gap-1' : 'text-cyber-text-muted'}`}>
+          {error && <AlertCircle size={12} />}
+          {label}
+        </label>
         <button onClick={addItem} className="text-xs text-cyber-accent hover:text-cyber-accent-hover flex items-center gap-1"><Plus size={12} />Add</button>
       </div>
       {value.map((v, i) => (
         <div key={i} className="flex gap-2 items-center">
-          <input className="flex-1" placeholder={placeholder} value={v} onChange={e => updateItem(i, e.target.value)} />
+          <input
+            className={`flex-1 ${error ? 'border-cyber-error ring-2 ring-cyber-error/30 bg-cyber-error/5' : ''}`}
+            placeholder={placeholder}
+            value={v}
+            onChange={e => updateItem(i, e.target.value)}
+          />
           <IconButton icon={Trash2} onClick={() => removeItem(i)} variant="danger" size="sm" />
         </div>
       ))}
+      {error && (
+        <div className="mt-2 p-3 rounded-lg border border-cyber-error/40 bg-cyber-error/10 animate-fade-in">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={16} className="text-cyber-error mt-0.5 flex-shrink-0" />
+            <div className="flex-1 space-y-2 text-sm">
+              <p className="font-medium text-cyber-error">{error.message}</p>
+              <p className="text-cyber-text-muted text-xs">{getErrorHelp(error.message).explanation}</p>
+              <div className="flex items-start gap-2 p-2 bg-cyber-success/10 rounded border border-cyber-success/30">
+                <CheckCircle size={14} className="text-cyber-success mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-cyber-success">{getErrorHelp(error.message).solution}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -179,7 +319,7 @@ const TemplateModal = ({ onSelect, onClose }) => {
 };
 
 // Service Editor
-const ServiceEditor = ({ name, service, onUpdate, allNetworks, allServices, allVolumes }) => {
+const ServiceEditor = ({ name, service, onUpdate, allNetworks, allServices, allVolumes, errors = [] }) => {
   const update = (field, value) => onUpdate({ ...service, [field]: value });
   const updateNested = (path, value) => {
     const keys = path.split('.');
@@ -190,16 +330,41 @@ const ServiceEditor = ({ name, service, onUpdate, allNetworks, allServices, allV
     onUpdate(newService);
   };
 
+  // Helper to find errors matching specific patterns for this service
+  const getFieldError = (patterns) => {
+    return errors.find(e =>
+      e.name === name &&
+      patterns.some(p => e.message.toLowerCase().includes(p.toLowerCase()))
+    );
+  };
+
+  // Map error types to fields
+  const imageError = getFieldError(['image', 'build']);
+  const containerNameError = getFieldError(['container_name', 'container name']);
+  const portsError = getFieldError(['port']);
+  const volumesError = getFieldError(['volume']);
+  const networksError = getFieldError(['network']);
+  const dependsOnError = getFieldError(['dependency', 'depends']);
+
+  // Count errors for this service
+  const serviceErrors = errors.filter(e => e.name === name);
+
   return (
     <div className="space-y-4 animate-slide-in">
+      {/* Header with error badge */}
       <div className="flex items-center justify-between pb-3 border-b border-cyber-border/50">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Server className="text-cyber-accent" />{name}</h2>
-        <Badge type="success">Service</Badge>
+        <div className="flex items-center gap-2">
+          {serviceErrors.length > 0 && (
+            <Badge type="error">{serviceErrors.length} issue{serviceErrors.length !== 1 && 's'}</Badge>
+          )}
+          <Badge type="success">Service</Badge>
+        </div>
       </div>
 
       <Section title="General" icon={Settings}>
-        <Input label="Image" value={service.image} onChange={v => update('image', v)} placeholder="nginx:latest" tooltip="Docker image to use" />
-        <Input label="Container Name" value={service.container_name} onChange={v => update('container_name', v)} placeholder="my-container" />
+        <Input label="Image" value={service.image} onChange={v => update('image', v)} placeholder="nginx:latest" tooltip="Docker image to use" error={imageError} />
+        <Input label="Container Name" value={service.container_name} onChange={v => update('container_name', v)} placeholder="my-container" error={containerNameError} />
         <Select
           label="Restart Policy"
           value={service.restart}
@@ -228,11 +393,14 @@ const ServiceEditor = ({ name, service, onUpdate, allNetworks, allServices, allV
         <Input label="User" value={service.user} onChange={v => update('user', v)} placeholder="node:node" tooltip="User to run as (user:group)" />
       </Section>
 
-      <Section title="Networking" icon={Globe} defaultOpen={false}>
-        <ArrayEditor label="Ports" value={service.ports} onChange={v => update('ports', v)} placeholder="8080:80" />
+      <Section title="Networking" icon={Globe} defaultOpen={!!portsError || !!networksError}>
+        <ArrayEditor label="Ports" value={service.ports} onChange={v => update('ports', v)} placeholder="8080:80" error={portsError} />
         <ArrayEditor label="Expose" value={service.expose} onChange={v => update('expose', v)} placeholder="3000" />
         <div className="space-y-2">
-          <label className="text-xs text-cyber-text-muted">Networks</label>
+          <label className={`text-xs ${networksError ? 'text-cyber-error flex items-center gap-1' : 'text-cyber-text-muted'}`}>
+            {networksError && <AlertCircle size={12} />}
+            Networks
+          </label>
           <div className="flex flex-wrap gap-2">
             {Object.keys(allNetworks).map(net => (
               <label key={net} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-surface-light/50 cursor-pointer hover:bg-cyber-surface-light">
@@ -241,6 +409,21 @@ const ServiceEditor = ({ name, service, onUpdate, allNetworks, allServices, allV
               </label>
             ))}
           </div>
+          {networksError && (
+            <div className="mt-2 p-3 rounded-lg border border-cyber-warning/40 bg-cyber-warning/10 animate-fade-in">
+              <div className="flex items-start gap-2">
+                <AlertCircle size={16} className="text-cyber-warning mt-0.5 flex-shrink-0" />
+                <div className="flex-1 space-y-2 text-sm">
+                  <p className="font-medium text-cyber-warning">{networksError.message}</p>
+                  <p className="text-cyber-text-muted text-xs">{getErrorHelp(networksError.message).explanation}</p>
+                  <div className="flex items-start gap-2 p-2 bg-cyber-success/10 rounded border border-cyber-success/30">
+                    <CheckCircle size={14} className="text-cyber-success mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-cyber-success">{getErrorHelp(networksError.message).solution}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Section>
 
@@ -249,13 +432,16 @@ const ServiceEditor = ({ name, service, onUpdate, allNetworks, allServices, allV
         <KeyValueEditor label="Variables" value={service.environment} onChange={v => update('environment', v)} keyPlaceholder="ENV_VAR" valuePlaceholder="value" />
       </Section>
 
-      <Section title="Volumes" icon={Database} defaultOpen={false}>
-        <ArrayEditor label="Volume Mounts" value={service.volumes} onChange={v => update('volumes', v)} placeholder="data:/app/data" />
+      <Section title="Volumes" icon={Database} defaultOpen={!!volumesError}>
+        <ArrayEditor label="Volume Mounts" value={service.volumes} onChange={v => update('volumes', v)} placeholder="data:/app/data" error={volumesError} />
       </Section>
 
-      <Section title="Dependencies" icon={Layers} defaultOpen={false}>
+      <Section title="Dependencies" icon={Layers} defaultOpen={!!dependsOnError}>
         <div className="space-y-2">
-          <label className="text-xs text-cyber-text-muted">Depends On</label>
+          <label className={`text-xs ${dependsOnError ? 'text-cyber-error flex items-center gap-1' : 'text-cyber-text-muted'}`}>
+            {dependsOnError && <AlertCircle size={12} />}
+            Depends On
+          </label>
           <div className="flex flex-wrap gap-2">
             {Object.keys(allServices).filter(s => s !== name).map(svc => (
               <label key={svc} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-surface-light/50 cursor-pointer hover:bg-cyber-surface-light">
@@ -264,6 +450,21 @@ const ServiceEditor = ({ name, service, onUpdate, allNetworks, allServices, allV
               </label>
             ))}
           </div>
+          {dependsOnError && (
+            <div className="mt-2 p-3 rounded-lg border border-cyber-error/40 bg-cyber-error/10 animate-fade-in">
+              <div className="flex items-start gap-2">
+                <AlertCircle size={16} className="text-cyber-error mt-0.5 flex-shrink-0" />
+                <div className="flex-1 space-y-2 text-sm">
+                  <p className="font-medium text-cyber-error">{dependsOnError.message}</p>
+                  <p className="text-cyber-text-muted text-xs">{getErrorHelp(dependsOnError.message).explanation}</p>
+                  <div className="flex items-start gap-2 p-2 bg-cyber-success/10 rounded border border-cyber-success/30">
+                    <CheckCircle size={14} className="text-cyber-success mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-cyber-success">{getErrorHelp(dependsOnError.message).solution}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Section>
 
@@ -726,7 +927,7 @@ export default function App() {
     if (!item) return null;
 
     switch (type) {
-      case 'services': return <ServiceEditor name={name} service={item} onUpdate={handleUpdate} allNetworks={state.networks} allServices={state.services} allVolumes={state.volumes} />;
+      case 'services': return <ServiceEditor name={name} service={item} onUpdate={handleUpdate} allNetworks={state.networks} allServices={state.services} allVolumes={state.volumes} errors={errors} />;
       case 'networks': return <NetworkEditor name={name} network={item} onUpdate={handleUpdate} />;
       case 'volumes': return <VolumeEditor name={name} volume={item} onUpdate={handleUpdate} />;
       case 'secrets': return <SecretEditor name={name} secret={item} onUpdate={handleUpdate} />;
@@ -784,11 +985,22 @@ export default function App() {
             <div className="flex-1 overflow-auto p-2">
               <ResourceTree state={state} selected={selected} onSelect={setSelected} onAdd={handleAdd} onDelete={handleDelete} errors={errors} searchTerm={searchTerm} />
             </div>
-            {errors.length > 0 && (
-              <div className="p-3 border-t border-cyber-border/50">
-                <div className="flex items-center gap-2 text-sm text-cyber-warning"><AlertCircle size={14} />{errors.length} issue{errors.length !== 1 && 's'} found</div>
-              </div>
-            )}
+            <IssuesPanel errors={errors} onSelect={setSelected} />
+            {/* Spec Compliance Badge */}
+            <div className="px-3 py-2 border-t border-cyber-border/50">
+              <a
+                href="https://docs.docker.com/reference/compose-file/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-surface-light/50 hover:bg-cyber-accent/20 transition-colors group"
+              >
+                <CheckCircle size={12} className="text-cyber-success" />
+                <span className="text-xs text-cyber-text-muted group-hover:text-cyber-accent transition-colors">
+                  Compose Spec v2.x
+                </span>
+                <Globe size={10} className="text-cyber-text-muted group-hover:text-cyber-accent" />
+              </a>
+            </div>
             <div className="p-3 border-t border-cyber-border/50">
               <button onClick={handleClearAll} className="w-full text-xs text-cyber-text-muted hover:text-cyber-error transition-colors">Clear All</button>
             </div>

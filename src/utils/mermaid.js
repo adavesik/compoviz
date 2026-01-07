@@ -271,7 +271,7 @@ export const generateMermaidGraph = (state) => {
 const PROJECT_COLORS = [
     { bg: '#1e3a8a', stroke: '#3b82f6', name: 'blue' },   // Blue
     { bg: '#065f46', stroke: '#10b981', name: 'green' },  // Green
-    { bg: '#7c2d12', stroke: '#f97316', name: 'orange' }, // Orange
+    { bg: '#164e63', stroke: '#06b6d4', name: 'cyan' },   // Cyan (colorblind-friendly)
 ];
 
 /**

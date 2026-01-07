@@ -8,6 +8,7 @@ import { generateMultiProjectGraph } from '../utils/mermaid';
 // Conflict Panel Component
 const ConflictPanel = ({ results }) => {
     const summary = getComparisonSummary(results);
+    const [expandedIdx, setExpandedIdx] = useState(null);
 
     const severityIcon = {
         error: <XCircle size={14} className="text-cyber-error" />,
@@ -31,7 +32,7 @@ const ConflictPanel = ({ results }) => {
     }
 
     return (
-        <div className="p-3 space-y-3 overflow-auto max-h-64">
+        <div className="p-3 space-y-3">
             {/* Summary */}
             <div className="flex gap-3 text-xs">
                 {summary.errors > 0 && (
@@ -53,16 +54,41 @@ const ConflictPanel = ({ results }) => {
 
             {/* Results list */}
             {results.map((result, idx) => (
-                <div key={idx} className={`p-2 rounded-lg border ${severityBg[result.severity]}`}>
+                <div
+                    key={idx}
+                    className={`p-2 rounded-lg border cursor-pointer transition-all hover:brightness-110 ${severityBg[result.severity]}`}
+                    onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
+                >
                     <div className="flex items-start gap-2">
                         {severityIcon[result.severity]}
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium">{result.message}</p>
                             <p className="text-xs text-cyber-text-muted mt-1">
                                 Projects: {result.projects.join(', ')}
+                                <span className="ml-2 text-cyber-accent">
+                                    {expandedIdx === idx ? '▲ collapse' : '▼ details'}
+                                </span>
                             </p>
                         </div>
                     </div>
+                    {/* Expanded details */}
+                    {expandedIdx === idx && result.details && Array.isArray(result.details) && (
+                        <div className="mt-3 pt-2 border-t border-white/10 space-y-1.5 animate-fade-in">
+                            <p className="text-xs text-cyber-text-muted font-medium mb-2">Affected services:</p>
+                            {result.details.map((detail, i) => (
+                                <div key={i} className="flex items-center gap-2 text-xs bg-black/20 rounded px-2 py-1">
+                                    <span className="font-medium text-cyber-text">{detail.project}</span>
+                                    <span className="text-cyber-text-muted">→</span>
+                                    <span className="text-cyber-accent font-medium">{detail.service}</span>
+                                    {detail.mapping && (
+                                        <code className="ml-auto bg-cyber-surface px-1.5 py-0.5 rounded text-cyber-warning font-mono">
+                                            {detail.mapping}
+                                        </code>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             ))}
         </div>
@@ -134,7 +160,7 @@ const MultiProjectDiagram = memo(({ projects, conflicts }) => {
                     <span className="text-xs">Project B</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-[#7c2d12] border-2 border-[#f97316]"></div>
+                    <div className="w-4 h-4 rounded bg-[#164e63] border-2 border-[#06b6d4]"></div>
                     <span className="text-xs">Project C</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -279,10 +305,10 @@ export default function CompareView() {
                                 key={project.id}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${idx === 0 ? 'bg-blue-500/10 border-blue-500/30' :
                                     idx === 1 ? 'bg-green-500/10 border-green-500/30' :
-                                        'bg-orange-500/10 border-orange-500/30'
+                                        'bg-cyan-500/10 border-cyan-500/30'
                                     }`}
                             >
-                                <span className="text-lg">{['🔵', '🟢', '🟠'][idx]}</span>
+                                <span className="text-lg">{['🔵', '🟢', '🩵'][idx]}</span>
                                 <span className="text-sm font-medium">{project.name}</span>
                                 <span className="text-xs text-cyber-text-muted">
                                     ({Object.keys(project.content?.services || {}).length} services)
