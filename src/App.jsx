@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, memo, lazy, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import mermaid from 'mermaid';
-import { Server, Network, Database, Key, FileText, Plus, Trash2, ChevronDown, ChevronRight, Download, Upload, Search, ZoomIn, ZoomOut, RotateCcw, AlertCircle, CheckCircle, Copy, Settings, Cpu, HardDrive, Heart, Tag, Globe, Lock, FolderOpen, X, Menu, Eye, Code, Layers, Undo2, Redo2, Sparkles, Terminal, Play, GitCompare } from 'lucide-react';
+import { Server, Network, Database, Key, FileText, Plus, Trash2, ChevronDown, ChevronRight, Download, Upload, Search, ZoomIn, ZoomOut, RotateCcw, AlertCircle, CheckCircle, Copy, Settings, Cpu, HardDrive, Heart, Tag, Globe, Lock, FolderOpen, X, Menu, Eye, Code, Layers, Undo2, Redo2, Sparkles, Terminal, Play, GitCompare, PenTool } from 'lucide-react';
 
 // Import utilities and hooks
 import { generateYaml, parseYaml } from './utils/yaml';
@@ -11,6 +12,19 @@ import { useHistoryReducer } from './hooks/useHistory';
 import { serviceTemplates, getTemplateNames } from './data/templates';
 import CompareView from './components/CompareView';
 import { Analytics } from '@vercel/analytics/react';
+
+// Lazy load the Visual Builder (React Flow) - only loads when user clicks Build tab
+const VisualBuilder = lazy(() => import('./components/VisualBuilder'));
+
+// Builder loading skeleton
+const BuilderSkeleton = () => (
+  <div className="builder-skeleton">
+    <div className="builder-skeleton-content">
+      <Layers size={48} className="builder-skeleton-icon" />
+      <p>Loading Visual Builder...</p>
+    </div>
+  </div>
+);
 
 // Initialize Mermaid with enhanced styling
 mermaid.initialize({
@@ -634,14 +648,72 @@ const ResourceTree = ({ state, selected, onSelect, onAdd, onDelete, errors, sear
   );
 };
 
+// Context Menu for Diagram view
+const ContextMenu = ({ x, y, onClose, onAdd }) => {
+  const menuRef = useRef(null);
+
+  // Close on click outside or escape
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) onClose();
+    };
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
+
+  const items = [
+    { key: 'services', label: 'Add Service', icon: Server, color: 'text-cyber-accent' },
+    { key: 'networks', label: 'Add Network', icon: Network, color: 'text-cyber-success' },
+    { key: 'volumes', label: 'Add Volume', icon: Database, color: 'text-cyber-warning' },
+    { key: 'secrets', label: 'Add Secret', icon: Key, color: 'text-cyber-purple' },
+    { key: 'configs', label: 'Add Config', icon: FileText, color: 'text-cyber-cyan' },
+  ];
+
+  // Adjust position to keep menu in viewport
+  const adjustedX = Math.min(x, window.innerWidth - 200);
+  const adjustedY = Math.min(y, window.innerHeight - 280);
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      className="fixed z-[9999] glass rounded-xl py-2 shadow-xl animate-fade-in min-w-[180px] border border-cyber-border/50"
+      style={{ left: adjustedX, top: adjustedY }}
+    >
+      <div className="px-3 py-1.5 text-xs text-cyber-text-muted uppercase tracking-wide border-b border-cyber-border/30 mb-1">
+        Quick Add
+      </div>
+      {items.map(({ key, label, icon: Icon, color }) => (
+        <button
+          key={key}
+          onClick={() => { onAdd(key); onClose(); }}
+          className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-cyber-surface-light transition-colors text-left group"
+        >
+          <Icon size={16} className={color} />
+          <span className="text-sm group-hover:text-cyber-accent transition-colors">{label}</span>
+          <Plus size={12} className="ml-auto text-cyber-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+      ))}
+    </div>,
+    document.body
+  );
+};
+
 // Mermaid Diagram with Error Boundary
-const MermaidDiagram = memo(({ graph, onNodeClick }) => {
+const MermaidDiagram = memo(({ graph, onNodeClick, onAdd }) => {
   const containerRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [error, setError] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
 
   useEffect(() => {
     const render = async () => {
@@ -663,10 +735,20 @@ const MermaidDiagram = memo(({ graph, onNodeClick }) => {
     render();
   }, [graph, onNodeClick]);
 
-  const handleMouseDown = (e) => { setDragging(true); setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y }); };
+  const handleMouseDown = (e) => {
+    if (e.button === 0) { // Left click only
+      setDragging(true);
+      setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+    }
+  };
   const handleMouseMove = (e) => { if (dragging) setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }); };
   const handleMouseUp = () => setDragging(false);
   const resetView = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
+
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
 
   if (error) return <div className="flex items-center justify-center h-full text-cyber-error"><AlertCircle className="mr-2" />Diagram Error: {error}</div>;
 
@@ -677,6 +759,11 @@ const MermaidDiagram = memo(({ graph, onNodeClick }) => {
         <IconButton icon={ZoomIn} onClick={() => setScale(s => Math.min(s + 0.2, 3))} title="Zoom In" />
         <IconButton icon={ZoomOut} onClick={() => setScale(s => Math.max(s - 0.2, 0.3))} title="Zoom Out" />
         <IconButton icon={RotateCcw} onClick={resetView} title="Reset View" />
+      </div>
+
+      {/* Hint for right-click */}
+      <div className="absolute top-2 left-2 z-10 text-xs text-cyber-text-muted glass rounded-lg px-3 py-1.5">
+        💡 Right-click to add resources
       </div>
 
       {/* Legend */}
@@ -697,9 +784,26 @@ const MermaidDiagram = memo(({ graph, onNodeClick }) => {
       </div>
 
       {/* Diagram */}
-      <div className="mermaid-container" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+      <div
+        className="mermaid-container"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onContextMenu={handleContextMenu}
+      >
         <div ref={containerRef} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, transformOrigin: 'center center', transition: dragging ? 'none' : 'transform 0.2s' }} className="w-full h-full flex items-center justify-center" />
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onAdd={onAdd}
+        />
+      )}
     </div>
   );
 });
@@ -960,7 +1064,8 @@ export default function App() {
             </div>
             <div className="flex gap-1 glass rounded-lg p-1">
               <button onClick={() => setView('editor')} className={`px-3 py-1.5 rounded text-sm transition-colors ${view === 'editor' ? 'bg-cyber-accent text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><Code size={14} className="inline mr-1" />Editor</button>
-              <button onClick={() => setView('diagram')} className={`px-3 py-1.5 rounded text-sm transition-colors ${view === 'diagram' ? 'bg-cyber-accent text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><Eye size={14} className="inline mr-1" />Diagram</button>
+              <button onClick={() => setView('build')} className={`px-3 py-1.5 rounded text-sm transition-colors ${view === 'build' ? 'bg-cyber-success text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><PenTool size={14} className="inline mr-1" />Build</button>
+              <button onClick={() => setView('diagram')} className={`px-3 py-1.5 rounded text-sm transition-colors ${view === 'diagram' ? 'bg-cyber-accent text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><Eye size={14} className="inline mr-1" />View</button>
               <button onClick={() => setView('compare')} className={`px-3 py-1.5 rounded text-sm transition-colors ${view === 'compare' ? 'bg-cyber-purple text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><GitCompare size={14} className="inline mr-1" />Compare</button>
             </div>
             {view === 'diagram' && <IconButton icon={Download} onClick={handleExportDiagram} title="Export Diagram" />}
@@ -1011,6 +1116,20 @@ export default function App() {
             {view === 'compare' ? (
               /* Compare View - Takes full width */
               <CompareView />
+            ) : view === 'build' ? (
+              /* Build View - Visual drag-and-drop builder with React Flow */
+              <div className="flex-1 p-4">
+                <div className="h-full glass rounded-xl overflow-hidden">
+                  <Suspense fallback={<BuilderSkeleton />}>
+                    <VisualBuilder
+                      state={state}
+                      dispatch={dispatch}
+                      onSelectNode={setSelected}
+                      errors={errors}
+                    />
+                  </Suspense>
+                </div>
+              </div>
             ) : view === 'editor' ? (
               <>
                 {/* Editor Panel */}
@@ -1021,10 +1140,10 @@ export default function App() {
                 </div>
               </>
             ) : (
-              /* Diagram View */
+              /* Diagram View (Mermaid - read-only) */
               <div className="flex-1 p-4">
                 <div className="h-full glass rounded-xl overflow-hidden">
-                  <MermaidDiagram graph={mermaidGraph} onNodeClick={setSelected} />
+                  <MermaidDiagram graph={mermaidGraph} onNodeClick={setSelected} onAdd={handleAdd} />
                 </div>
               </div>
             )}

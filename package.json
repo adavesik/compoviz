@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
+    "@xyflow/react": "^12.10.0",
     "js-yaml": "^4.1.1",
     "lucide-react": "^0.562.0",
     "mermaid": "^11.12.2",

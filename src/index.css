@@ -406,3 +406,567 @@ textarea::placeholder {
   @apply w-1 cursor-col-resize bg-cyber-border/50;
   @apply hover:bg-cyber-accent transition-colors duration-150;
 }
+
+/* ========================================
+   React Flow Visual Builder Styles
+   ======================================== */
+
+.visual-builder {
+  @apply w-full h-full;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 60%),
+    linear-gradient(135deg, #0a0e17 0%, #0f172a 50%, #1e1b4b 100%);
+}
+
+/* React Flow Background */
+.react-flow__background {
+  background: transparent !important;
+}
+
+.react-flow__background pattern circle {
+  fill: rgba(100, 116, 139, 0.3);
+}
+
+/* Controls panel */
+.builder-controls {
+  background: rgba(17, 24, 39, 0.9) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(55, 65, 81, 0.5) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.builder-controls button {
+  background: transparent !important;
+  border: none !important;
+  color: var(--color-cyber-text-muted) !important;
+  padding: 8px !important;
+}
+
+.builder-controls button:hover {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: var(--color-cyber-accent) !important;
+}
+
+.builder-controls button svg {
+  fill: currentColor !important;
+}
+
+/* Mini-map */
+.builder-minimap {
+  background: rgba(17, 24, 39, 0.9) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(55, 65, 81, 0.5) !important;
+  border-radius: 12px !important;
+}
+
+/* ========================================
+   Custom Node Styles
+   ======================================== */
+
+.builder-node {
+  @apply rounded-xl border transition-all duration-200;
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(12px);
+  min-width: 180px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.builder-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.builder-node.selected {
+  box-shadow: 0 0 0 2px var(--color-cyber-accent),
+    0 8px 30px rgba(59, 130, 246, 0.3);
+}
+
+/* Service Node */
+.service-node {
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.service-node:hover,
+.service-node.selected {
+  border-color: var(--color-cyber-accent);
+}
+
+.service-header {
+  @apply flex items-center gap-2 px-3 py-2 rounded-t-xl;
+  background: rgba(59, 130, 246, 0.15);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.service-header .node-icon {
+  color: var(--color-cyber-accent);
+}
+
+/* Network Node */
+.network-node {
+  border-color: rgba(16, 185, 129, 0.5);
+  border-radius: 50%;
+  min-width: 100px;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.network-node:hover,
+.network-node.selected {
+  border-color: var(--color-cyber-success);
+  box-shadow: 0 0 0 2px var(--color-cyber-success),
+    0 8px 30px rgba(16, 185, 129, 0.3);
+}
+
+.network-node .node-icon {
+  color: var(--color-cyber-success);
+}
+
+/* Volume Node */
+.volume-node {
+  border-color: rgba(245, 158, 11, 0.5);
+  border-radius: 8px 8px 20px 20px;
+  min-width: 100px;
+}
+
+.volume-node:hover,
+.volume-node.selected {
+  border-color: var(--color-cyber-warning);
+  box-shadow: 0 0 0 2px var(--color-cyber-warning),
+    0 8px 30px rgba(245, 158, 11, 0.3);
+}
+
+.volume-node .node-icon {
+  color: var(--color-cyber-warning);
+}
+
+/* Secret Node */
+.secret-node {
+  border-color: rgba(139, 92, 246, 0.5);
+  border-radius: 12px;
+  min-width: 100px;
+}
+
+.secret-node:hover,
+.secret-node.selected {
+  border-color: var(--color-cyber-purple);
+  box-shadow: 0 0 0 2px var(--color-cyber-purple),
+    0 8px 30px rgba(139, 92, 246, 0.3);
+}
+
+.secret-node .node-icon {
+  color: var(--color-cyber-purple);
+}
+
+/* Config Node */
+.config-node {
+  border-color: rgba(6, 182, 212, 0.5);
+  border-radius: 12px;
+  min-width: 100px;
+}
+
+.config-node:hover,
+.config-node.selected {
+  border-color: var(--color-cyber-cyan);
+  box-shadow: 0 0 0 2px var(--color-cyber-cyan),
+    0 8px 30px rgba(6, 182, 212, 0.3);
+}
+
+.config-node .node-icon {
+  color: var(--color-cyber-cyan);
+}
+
+/* Node content */
+.node-content {
+  @apply flex flex-col items-center justify-center gap-1 p-3 text-center;
+}
+
+.node-title {
+  @apply font-semibold text-sm text-cyber-text;
+}
+
+.node-subtitle {
+  @apply text-xs text-cyber-text-muted;
+}
+
+.node-body {
+  @apply px-3 py-2 space-y-1;
+}
+
+.node-field {
+  @apply flex items-center gap-2 text-xs;
+}
+
+.field-label {
+  @apply text-cyber-text-muted;
+}
+
+.field-value {
+  @apply text-cyber-text truncate max-w-[120px];
+}
+
+.node-indicators {
+  @apply flex items-center gap-2 mt-2 pt-2 border-t border-cyber-border/30;
+}
+
+.indicator {
+  @apply flex items-center gap-1 text-cyber-text-muted;
+}
+
+.indicator-count {
+  @apply text-xs bg-cyber-surface-light rounded-full px-1.5;
+}
+
+/* Connection Handles */
+.builder-handle {
+  @apply w-3 h-3 rounded-full border-2;
+  background: var(--color-cyber-surface) !important;
+  border-color: var(--color-cyber-border) !important;
+  transition: all 0.2s ease;
+}
+
+.builder-handle:hover {
+  background: var(--color-cyber-accent) !important;
+  border-color: var(--color-cyber-accent) !important;
+  transform: scale(1.3);
+}
+
+.handle-right {
+  right: -6px;
+}
+
+/* ========================================
+   Edge Labels
+   ======================================== */
+
+.edge-label {
+  @apply px-2 py-1 text-xs font-medium rounded;
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+}
+
+.depends-on-label {
+  color: #f472b6;
+  border-color: rgba(244, 114, 182, 0.3);
+}
+
+.volume-label {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* ========================================
+   Builder Toolbar
+   ======================================== */
+
+.builder-toolbar {
+  @apply rounded-xl p-3;
+  background: rgba(17, 24, 39, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+}
+
+.toolbar-label {
+  @apply text-xs text-cyber-text-muted uppercase tracking-wide mb-2 px-1;
+}
+
+.toolbar-items {
+  @apply flex gap-2;
+}
+
+.toolbar-item {
+  @apply flex flex-col items-center gap-1 px-3 py-2 rounded-lg;
+  @apply cursor-grab transition-all duration-200;
+  @apply bg-cyber-surface-light/50 hover:bg-cyber-surface-light;
+  @apply border border-cyber-border/30 hover:border-cyber-accent/50;
+}
+
+.toolbar-item:active {
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+.toolbar-item span {
+  @apply text-xs text-cyber-text-muted;
+}
+
+.toolbar-item:hover span {
+  @apply text-cyber-text;
+}
+
+/* ========================================
+   Builder Actions
+   ======================================== */
+
+.builder-actions {
+  @apply flex gap-1 rounded-lg p-1;
+  background: rgba(17, 24, 39, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+}
+
+.builder-action-btn {
+  @apply p-2 rounded-lg transition-all duration-200;
+  @apply text-cyber-text-muted hover:text-cyber-accent;
+  @apply hover:bg-cyber-surface-light;
+}
+
+/* ========================================
+   Builder Legend
+   ======================================== */
+
+.builder-legend {
+  @apply rounded-xl p-3 space-y-2;
+  background: rgba(17, 24, 39, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+  min-width: 140px;
+}
+
+.legend-title {
+  @apply text-xs font-semibold text-cyber-text-muted uppercase tracking-wide;
+}
+
+.legend-item {
+  @apply flex items-center gap-3 text-sm text-cyber-text;
+}
+
+.legend-line {
+  @apply w-6 h-0.5;
+}
+
+.legend-line.depends-on {
+  background: #f472b6;
+  box-shadow: 0 0 6px #f472b6;
+}
+
+.legend-line.network {
+  background: transparent;
+  border-top: 2px dashed #22d3ee;
+}
+
+.legend-line.volume {
+  background: transparent;
+  border-top: 2px dotted #fbbf24;
+}
+
+/* Builder loading skeleton */
+.builder-skeleton {
+  @apply w-full h-full flex items-center justify-center;
+  background: linear-gradient(135deg, #0a0e17 0%, #0f172a 50%, #1e1b4b 100%);
+}
+
+.builder-skeleton-content {
+  @apply text-center text-cyber-text-muted;
+}
+
+.builder-skeleton-icon {
+  @apply animate-pulse mb-4;
+}
+
+/* ========================================
+   Node Configuration Panel
+   ======================================== */
+
+.node-config-panel {
+  @apply flex flex-col h-full overflow-hidden;
+  width: 420px;
+  background: rgba(17, 24, 39, 0.98);
+  backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(55, 65, 81, 0.5);
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.config-panel-header {
+  @apply flex items-center justify-between p-4;
+  border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+  background: rgba(31, 41, 55, 0.5);
+}
+
+.config-panel-content {
+  @apply flex-1 overflow-auto p-4;
+}
+
+/* Config Sections */
+.config-sections {
+  @apply space-y-3;
+}
+
+.config-section {
+  @apply rounded-lg overflow-hidden;
+  border: 1px solid rgba(55, 65, 81, 0.4);
+  background: rgba(31, 41, 55, 0.3);
+}
+
+.config-section-highlight {
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.config-section-header {
+  @apply w-full flex items-center justify-between px-4 py-3;
+  @apply text-sm font-medium text-cyber-text;
+  @apply cursor-pointer transition-colors duration-150;
+  background: rgba(31, 41, 55, 0.5);
+}
+
+.config-section-header:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.config-section-content {
+  @apply p-4 space-y-4;
+  border-top: 1px solid rgba(55, 65, 81, 0.3);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Config Fields */
+.config-field {
+  @apply space-y-1;
+}
+
+.config-label {
+  @apply block text-xs text-cyber-text-muted mb-1.5;
+  @apply flex items-center gap-2;
+}
+
+.config-tooltip {
+  @apply inline-flex items-center justify-center w-4 h-4 rounded-full;
+  @apply text-xs bg-cyber-surface-light text-cyber-text-muted cursor-help;
+}
+
+.config-input {
+  @apply w-full px-3 py-2 rounded-lg text-sm;
+  @apply bg-cyber-surface border border-cyber-border;
+  @apply text-cyber-text placeholder-cyber-text-muted;
+  @apply focus:outline-none focus:border-cyber-accent focus:ring-1 focus:ring-cyber-accent/30;
+  @apply transition-all duration-150;
+}
+
+.config-input:hover {
+  @apply border-cyber-border-glow/50;
+}
+
+.config-textarea {
+  @apply resize-none;
+  min-height: 80px;
+}
+
+/* Config Grid for side-by-side inputs */
+.config-grid {
+  @apply grid grid-cols-2 gap-3;
+}
+
+/* Checkbox */
+.config-checkbox {
+  @apply flex items-center gap-2 text-sm text-cyber-text cursor-pointer;
+  @apply py-2 px-3 rounded-lg;
+  @apply hover:bg-cyber-surface-light/50 transition-colors;
+}
+
+.config-checkbox-input {
+  @apply w-4 h-4 rounded border-cyber-border bg-cyber-surface;
+  @apply text-cyber-accent focus:ring-cyber-accent focus:ring-offset-0;
+}
+
+/* Add/Remove buttons */
+.config-add-btn {
+  @apply flex items-center gap-1 text-xs text-cyber-accent;
+  @apply px-2 py-1 rounded-lg;
+  @apply hover:bg-cyber-accent/20 transition-colors;
+}
+
+.config-remove-btn {
+  @apply p-2 rounded-lg text-cyber-text-muted;
+  @apply hover:text-cyber-error hover:bg-cyber-error/20 transition-colors;
+}
+
+/* Multi-select */
+.config-multi-select {
+  @apply flex flex-wrap gap-2;
+}
+
+.config-multi-option {
+  @apply flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm;
+  @apply bg-cyber-surface-light/50 cursor-pointer;
+  @apply hover:bg-cyber-surface-light transition-colors;
+  @apply border border-transparent;
+}
+
+.config-multi-option:has(input:checked) {
+  @apply border-cyber-accent bg-cyber-accent/10;
+}
+
+.config-multi-option input {
+  @apply w-3.5 h-3.5 rounded border-cyber-border;
+  @apply text-cyber-accent focus:ring-1 focus:ring-cyber-accent/30;
+}
+
+/* Empty state for multi-select */
+.config-multi-select:empty::after {
+  content: "No options available";
+  @apply text-xs text-cyber-text-muted italic;
+}
+
+/* Config panel slide-in container */
+.visual-builder-with-panel {
+  @apply flex h-full;
+}
+
+.visual-builder-with-panel .visual-builder {
+  @apply flex-1;
+}
+
+/* Node context menu */
+.node-context-menu {
+  @apply fixed z-50 min-w-[180px] py-2 rounded-xl;
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.15s ease-out;
+}
+
+.node-context-menu-item {
+  @apply w-full flex items-center gap-3 px-4 py-2.5 text-sm;
+  @apply text-cyber-text transition-colors;
+}
+
+.node-context-menu-item:hover {
+  @apply bg-cyber-surface-light text-cyber-accent;
+}
+
+.node-context-menu-item-danger:hover {
+  @apply bg-cyber-error/20 text-cyber-error;
+}
+
+.node-context-menu-separator {
+  @apply h-px my-2 bg-cyber-border/50;
+}
