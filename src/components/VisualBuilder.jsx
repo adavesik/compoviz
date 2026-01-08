@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
     ReactFlow,
     Background,
@@ -26,6 +26,21 @@ export default function VisualBuilder({ state, dispatch, onSelectNode, errors = 
     const reactFlowWrapper = useRef(null);
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const [selectedNode, setSelectedNode] = useState(null);
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    // Handle window resize for mobile detection
+    useEffect(() => {
+        const handleResize = () => {
+            const mobile = window.innerWidth < 768;
+            setIsMobile(mobile);
+            // Auto-close config panel when switching to mobile
+            if (mobile && selectedNode) {
+                // Keep panel open but it will be full-screen via CSS
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [selectedNode]);
 
     // Convert compose state to React Flow format
     const { nodes: initialNodes, edges: initialEdges } = useMemo(

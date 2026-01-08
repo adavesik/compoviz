@@ -129,7 +129,7 @@ const NodeConfigPanel = memo(({
                     <div className={`p-2 rounded-lg ${bgColor}`}>
                         <TypeIcon size={20} className={color} />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                         {isRenaming ? (
                             <input
                                 type="text"
@@ -137,12 +137,12 @@ const NodeConfigPanel = memo(({
                                 onChange={(e) => setNewName(e.target.value)}
                                 onBlur={handleRename}
                                 onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-                                className="text-lg font-semibold bg-transparent border-b border-cyber-accent focus:outline-none"
+                                className="text-lg font-semibold bg-transparent border-b border-cyber-accent focus:outline-none w-full"
                                 autoFocus
                             />
                         ) : (
                             <h2
-                                className="text-lg font-semibold cursor-pointer hover:text-cyber-accent transition-colors"
+                                className="text-lg font-semibold cursor-pointer hover:text-cyber-accent transition-colors truncate"
                                 onClick={() => setIsRenaming(true)}
                                 title="Click to rename"
                             >
@@ -160,11 +160,13 @@ const NodeConfigPanel = memo(({
                     >
                         <Trash2 size={16} />
                     </button>
+                    {/* Close button - more prominent on mobile with "Done" text */}
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg text-cyber-text-muted hover:text-cyber-text hover:bg-cyber-surface-light transition-all"
+                        className="p-2 md:p-2 rounded-lg text-cyber-text-muted hover:text-cyber-text hover:bg-cyber-surface-light transition-all flex items-center gap-1"
                     >
-                        <X size={18} />
+                        <span className="md:hidden text-sm text-cyber-accent font-medium">Done</span>
+                        <X size={18} className="hidden md:block" />
                     </button>
                 </div>
             </div>

@@ -970,3 +970,175 @@ textarea::placeholder {
 .node-context-menu-separator {
   @apply h-px my-2 bg-cyber-border/50;
 }
+
+/* ========================================
+   Mobile Responsive Styles
+   ======================================== */
+
+/* Mobile breakpoint: < 768px */
+@media (max-width: 767px) {
+
+  /* Header adjustments */
+  .header-search {
+    display: none !important;
+  }
+
+  .header-view-buttons .view-btn-text {
+    display: none;
+  }
+
+  .header-view-buttons button {
+    padding: 0.5rem;
+  }
+
+  /* Sidebar - overlay mode on mobile */
+  .mobile-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 40;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .sidebar-mobile {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 280px;
+    max-width: 85vw;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-out;
+  }
+
+  .sidebar-mobile.open {
+    transform: translateX(0);
+  }
+
+  /* Node Config Panel - full screen overlay on mobile */
+  .node-config-panel {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    z-index: 60;
+    border-left: none !important;
+    border-radius: 0 !important;
+    animation: slideInFromBottom 0.3s ease-out;
+  }
+
+  @keyframes slideInFromBottom {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .config-panel-header {
+    padding: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(17, 24, 39, 0.98);
+    backdrop-filter: blur(16px);
+  }
+
+  .config-panel-content {
+    padding: 1rem;
+    padding-bottom: 2rem;
+  }
+
+  /* Builder panels - hide or minimize on mobile */
+  .builder-legend {
+    display: none;
+  }
+
+  .builder-minimap {
+    width: 80px !important;
+    height: 60px !important;
+  }
+
+  .builder-toolbar {
+    padding: 0.5rem;
+  }
+
+  .toolbar-items {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .toolbar-item {
+    padding: 0.5rem;
+    min-width: 50px;
+  }
+
+  .toolbar-item span {
+    font-size: 10px;
+  }
+
+  /* Main layout adjustments */
+  .main-editor-panel {
+    padding: 1rem;
+  }
+
+  /* Code preview - hidden on mobile, use Export button */
+  .code-preview-panel {
+    display: none !important;
+  }
+
+  /* Touch-friendly buttons */
+  .btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Undo/Redo buttons - smaller on mobile */
+  .undo-redo-group {
+    display: none;
+  }
+
+  /* Compare view adjustments */
+  .compare-view {
+    flex-direction: column;
+  }
+
+  .compare-panel {
+    min-height: 300px;
+  }
+}
+
+/* Tablet breakpoint: 768px - 1023px */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .node-config-panel {
+    width: 360px;
+  }
+
+  .builder-legend {
+    min-width: 120px;
+    padding: 0.5rem;
+  }
+
+  .legend-title {
+    font-size: 10px;
+  }
+
+  .legend-item {
+    font-size: 12px;
+    gap: 0.5rem;
+  }
+}
+
+/* Small desktop: hide code preview below xl */
+@media (max-width: 1279px) {
+  .code-preview-panel-desktop {
+    display: none !important;
+  }
+}

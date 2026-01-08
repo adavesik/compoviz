@@ -48,11 +48,27 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState('editor'); // 'editor' | 'diagram' | 'build' | 'compare'
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [yamlCode, setYamlCode] = useState('');
   const [errors, setErrors] = useState([]);
+
+  // Handle window resize for responsive behavior
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Auto-close sidebar on mobile when resizing down
+      if (mobile && sidebarOpen) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarOpen]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showMobileCode, setShowMobileCode] = useState(false);
 
   // Load from localStorage
   useEffect(() => {
@@ -128,6 +144,10 @@ export default function App() {
     try {
       const parsed = parseYaml(content);
       dispatch({ type: 'SET_STATE', payload: parsed });
+      // On mobile, switch to diagram mode to show the imported config visualized
+      if (isMobile) {
+        setView('diagram');
+      }
     } catch (e) { alert('Invalid YAML: ' + e.message); }
   };
 
@@ -243,20 +263,22 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Undo/Redo buttons */}
-            <div className="flex gap-1 glass rounded-lg p-1 mr-2">
+            {/* Undo/Redo buttons - hidden on mobile */}
+            <div className="undo-redo-group flex gap-1 glass rounded-lg p-1 mr-2">
               <IconButton icon={Undo2} onClick={undo} title="Undo (Ctrl+Z)" disabled={!canUndo} />
               <IconButton icon={Redo2} onClick={redo} title="Redo (Ctrl+Shift+Z)" disabled={!canRedo} />
             </div>
-            <div className="relative">
+            {/* Search - hidden on mobile */}
+            <div className="header-search relative hidden md:block">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-cyber-text-muted" />
               <input type="text" placeholder="Search resources..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 pr-4 py-2 w-48 lg:w-64 text-sm" />
             </div>
-            <div className="flex gap-1 glass rounded-lg p-1">
-              <button onClick={() => setView('editor')} className={`px-3 py-1.5 rounded text-sm transition-colors ${view === 'editor' ? 'bg-cyber-accent text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><Code size={14} className="inline mr-1" />Editor</button>
-              <button onClick={() => setView('build')} className={`px-3 py-1.5 rounded text-sm transition-colors ${view === 'build' ? 'bg-cyber-success text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><PenTool size={14} className="inline mr-1" />Build</button>
-              <button onClick={() => setView('diagram')} className={`px-3 py-1.5 rounded text-sm transition-colors ${view === 'diagram' ? 'bg-cyber-accent text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><Eye size={14} className="inline mr-1" />View</button>
-              <button onClick={() => setView('compare')} className={`px-3 py-1.5 rounded text-sm transition-colors ${view === 'compare' ? 'bg-cyber-purple text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><GitCompare size={14} className="inline mr-1" />Compare</button>
+            {/* View switcher - icons only on mobile */}
+            <div className="header-view-buttons flex gap-1 glass rounded-lg p-1">
+              <button onClick={() => setView('editor')} className={`px-2 md:px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 ${view === 'editor' ? 'bg-cyber-accent text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><Code size={14} /><span className="view-btn-text hidden md:inline">Editor</span></button>
+              <button onClick={() => setView('build')} className={`px-2 md:px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 ${view === 'build' ? 'bg-cyber-success text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><PenTool size={14} /><span className="view-btn-text hidden md:inline">Build</span></button>
+              <button onClick={() => setView('diagram')} className={`px-2 md:px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 ${view === 'diagram' ? 'bg-cyber-accent text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><Eye size={14} /><span className="view-btn-text hidden md:inline">View</span></button>
+              <button onClick={() => setView('compare')} className={`px-2 md:px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 ${view === 'compare' ? 'bg-cyber-purple text-white' : 'text-cyber-text-muted hover:text-cyber-text'}`}><GitCompare size={14} /><span className="view-btn-text hidden md:inline">Compare</span></button>
             </div>
             {view === 'diagram' && <IconButton icon={Download} onClick={handleExportDiagram} title="Export Diagram" />}
           </div>
@@ -264,8 +286,22 @@ export default function App() {
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Left Sidebar */}
-          <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 overflow-hidden border-r border-cyber-border/50 glass-light flex flex-col`}>
+          {/* Mobile sidebar overlay */}
+          {isMobile && sidebarOpen && (
+            <div
+              className="mobile-sidebar-overlay"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          {/* Left Sidebar - overlay on mobile, inline on desktop */}
+          <aside className={`
+            ${isMobile ? 'sidebar-mobile' : ''}
+            ${isMobile && sidebarOpen ? 'open' : ''}
+            ${!isMobile && sidebarOpen ? 'w-64' : ''}
+            ${!isMobile && !sidebarOpen ? 'w-0' : ''}
+            transition-all duration-300 overflow-hidden border-r border-cyber-border/50 glass-light flex flex-col
+          `}>
             <div className="p-3 border-b border-cyber-border/50 space-y-2">
               <input
                 type="text"
@@ -278,9 +314,9 @@ export default function App() {
               <button onClick={() => setShowTemplates(true)} className="btn btn-secondary w-full flex items-center justify-center gap-2"><Sparkles size={16} />From Template</button>
             </div>
             <div className="flex-1 overflow-auto p-2">
-              <ResourceTree state={state} selected={selected} onSelect={setSelected} onAdd={handleAdd} onDelete={handleDelete} errors={errors} searchTerm={searchTerm} />
+              <ResourceTree state={state} selected={selected} onSelect={(sel) => { setSelected(sel); if (isMobile) setSidebarOpen(false); }} onAdd={handleAdd} onDelete={handleDelete} errors={errors} searchTerm={searchTerm} />
             </div>
-            <IssuesPanel errors={errors} onSelect={setSelected} />
+            <IssuesPanel errors={errors} onSelect={(sel) => { setSelected(sel); if (isMobile) setSidebarOpen(false); }} />
             {/* Spec Compliance Badge */}
             <div className="px-3 py-2 border-t border-cyber-border/50">
               <a
@@ -340,11 +376,28 @@ export default function App() {
           </main>
         </div>
 
-        {/* Mobile YAML Toggle */}
-        <div className="xl:hidden fixed bottom-4 right-4">
-          <button onClick={handleExport} className="btn btn-primary shadow-lg glow"><Download size={18} className="mr-2" />Export YAML</button>
+        {/* Mobile YAML Toggle - View Code button */}
+        <div className="xl:hidden fixed bottom-4 right-4 flex gap-2">
+          <button onClick={() => setShowMobileCode(true)} className="btn btn-secondary shadow-lg glass"><Code size={18} className="mr-2" />View Code</button>
+          <button onClick={handleExport} className="btn btn-primary shadow-lg glow"><Download size={18} /></button>
         </div>
       </div>
+
+      {/* Mobile Code Modal */}
+      {showMobileCode && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-cyber-bg">
+          <div className="flex items-center justify-between p-4 border-b border-cyber-border/50 glass">
+            <h2 className="text-lg font-semibold">Docker Compose YAML</h2>
+            <div className="flex gap-2">
+              <button onClick={handleExport} className="btn btn-primary text-sm py-1.5"><Download size={16} className="mr-1" />Export</button>
+              <button onClick={() => setShowMobileCode(false)} className="text-cyber-accent font-medium">Done</button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <CodePreview yaml={yamlCode} onYamlChange={handleYamlChange} onExport={handleExport} onImport={handleImport} />
+          </div>
+        </div>
+      )}
 
       {/* Template Modal */}
       {showTemplates && <TemplateModal onSelect={handleAddFromTemplate} onClose={() => setShowTemplates(false)} />}
