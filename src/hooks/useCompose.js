@@ -16,13 +16,22 @@ export function composeReducer(state, action) {
     switch (action.type) {
         case 'SET_STATE': {
             const payload = action.payload || {};
+            const normalize = (items) => {
+                if (!items || typeof items !== 'object') return {};
+                const result = {};
+                for (const [k, v] of Object.entries(items)) {
+                    if (v && typeof v === 'object') result[k] = v;
+                    else result[k] = {}; // Ensure each entry is an object
+                }
+                return result;
+            };
             return {
                 name: payload.name || '',
-                services: payload.services || {},
-                networks: payload.networks || {},
-                volumes: payload.volumes || {},
-                secrets: payload.secrets || {},
-                configs: payload.configs || {},
+                services: normalize(payload.services),
+                networks: normalize(payload.networks),
+                volumes: normalize(payload.volumes),
+                secrets: normalize(payload.secrets),
+                configs: normalize(payload.configs),
             };
         }
         case 'ADD_SERVICE': return { ...state, services: { ...state.services, [action.name]: { image: '', ports: [], environment: {}, depends_on: [], networks: [], volumes: [], labels: {}, deploy: { resources: { limits: {}, reservations: {} } }, healthcheck: {} } } };

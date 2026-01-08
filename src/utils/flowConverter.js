@@ -35,6 +35,7 @@ export function stateToFlow(state) {
     // Services
     let serviceIndex = 0;
     for (const [name, service] of Object.entries(state.services || {})) {
+        if (!service) continue;
         const row = Math.floor(serviceIndex / SERVICES_PER_ROW);
         const col = serviceIndex % SERVICES_PER_ROW;
 
@@ -102,6 +103,7 @@ export function stateToFlow(state) {
     // Networks
     let networkIndex = 0;
     for (const [name, network] of Object.entries(state.networks || {})) {
+        if (!network) continue;
         const position = network._position || {
             x: NETWORK_START_X + networkIndex * NETWORK_SPACING,
             y: NETWORK_START_Y,
@@ -123,6 +125,7 @@ export function stateToFlow(state) {
     // Volumes
     let volumeIndex = 0;
     for (const [name, volume] of Object.entries(state.volumes || {})) {
+        if (!volume) continue;
         const position = volume._position || {
             x: VOLUME_START_X + volumeIndex * VOLUME_SPACING,
             y: VOLUME_START_Y,
@@ -144,6 +147,7 @@ export function stateToFlow(state) {
     // Secrets
     let secretIndex = 0;
     for (const [name, secret] of Object.entries(state.secrets || {})) {
+        if (!secret) continue;
         const position = secret._position || {
             x: SECRET_START_X + secretIndex * SECRET_SPACING,
             y: SECRET_START_Y,
@@ -165,6 +169,7 @@ export function stateToFlow(state) {
     // Configs
     let configIndex = 0;
     for (const [name, config] of Object.entries(state.configs || {})) {
+        if (!config) continue;
         const position = config._position || {
             x: CONFIG_START_X + configIndex * CONFIG_SPACING,
             y: CONFIG_START_Y,
