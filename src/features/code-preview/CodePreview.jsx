@@ -11,15 +11,70 @@ export const CodePreview = ({ yaml: yamlCode, onYamlChange, onExport, onImport }
     const [copied, setCopied] = useState(false);
     const fileInputRef = useRef(null);
 
-    const highlight = (code) => {
-        return code.split('\n').map((line, i) => {
-            let html = line.replace(/^(\s*)([a-zA-Z_][a-zA-Z0-9_-]*):/g, '$1<span class="yaml-key">$2</span>:')
-                .replace(/:\s*(['"].*['"])/g, ': <span class="yaml-string">$1</span>')
-                .replace(/:\s*(\d+)/g, ': <span class="yaml-number">$1</span>')
-                .replace(/:\s*(true|false)/gi, ': <span class="yaml-boolean">$1</span>')
-                .replace(/#.*/g, '<span class="yaml-comment">$&</span>');
-            return `<span class="text-cyber-text-muted select-none mr-4">${String(i + 1).padStart(3)}</span>${html}`;
-        }).join('\n');
+    const splitComment = (line) => {
+        const hashIndex = line.indexOf('#');
+        if (hashIndex === -1) return { code: line, comment: '' };
+        return {
+            code: line.slice(0, hashIndex),
+            comment: line.slice(hashIndex),
+        };
+    };
+
+    const highlightValue = (text) => {
+        const patterns = [
+            { regex: /^(\s*)(['"].*['"])/, className: 'yaml-string' },
+            { regex: /^(\s*)(\d+)/, className: 'yaml-number' },
+            { regex: /^(\s*)(true|false)/i, className: 'yaml-boolean' },
+        ];
+
+        for (const pattern of patterns) {
+            const match = text.match(pattern.regex);
+            if (match) {
+                const leading = match[1] || '';
+                const value = match[2] || '';
+                const rest = text.slice(match[0].length);
+                return [
+                    leading,
+                    <span key="value" className={pattern.className}>{value}</span>,
+                    rest,
+                ];
+            }
+        }
+
+        return [text];
+    };
+
+    const highlightLine = (line, index, totalLines) => {
+        const { code, comment } = splitComment(line);
+        const keyMatch = code.match(/^(\s*)([a-zA-Z_][a-zA-Z0-9_-]*)(:)(.*)$/);
+
+        const lineParts = [
+            <span key="line-number" className="text-cyber-text-muted select-none mr-4">
+                {String(index + 1).padStart(3)}
+            </span>,
+        ];
+
+        if (keyMatch) {
+            const indent = keyMatch[1] || '';
+            const key = keyMatch[2] || '';
+            const rest = keyMatch[4] || '';
+            lineParts.push(indent);
+            lineParts.push(<span key="key" className="yaml-key">{key}</span>);
+            lineParts.push(':');
+            lineParts.push(...highlightValue(rest));
+        } else {
+            lineParts.push(...highlightValue(code));
+        }
+
+        if (comment) {
+            lineParts.push(<span key="comment" className="yaml-comment">{comment}</span>);
+        }
+
+        if (index < totalLines - 1) {
+            lineParts.push('\n');
+        }
+
+        return <span key={index}>{lineParts}</span>;
     };
 
     const handleCopy = () => {
@@ -87,7 +142,9 @@ export const CodePreview = ({ yaml: yamlCode, onYamlChange, onExport, onImport }
                         spellCheck={false}
                     />
                 ) : (
-                    <pre className="code-preview" dangerouslySetInnerHTML={{ __html: highlight(yamlCode) }} />
+                    <pre className="code-preview">
+                        {yamlCode.split('\n').map((line, i, arr) => highlightLine(line, i, arr.length))}
+                    </pre>
                 )}
             </div>
         </div>
