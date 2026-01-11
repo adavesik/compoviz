@@ -130,11 +130,9 @@ export const GraphvizDiagram = memo(({ dot, onNodeClick, onAdd }) => {
 
     // Wheel zoom
     const handleWheel = useCallback((e) => {
-        if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            const delta = e.deltaY > 0 ? -0.1 : 0.1;
-            setScale(s => Math.min(Math.max(s + delta, 0.3), 3));
-        }
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setScale(s => Math.min(Math.max(s + delta, 0.3), 3));
     }, []);
 
     if (error) return (
