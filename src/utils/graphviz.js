@@ -108,15 +108,22 @@ export const generateGraphviz = (state) => {
         return `digraph G { bgcolor="transparent" empty [label="No services"] }`;
     }
 
-    // --- PHASE 1: PRE-PROCESSING ---
+    // --- PHASE 1: CLASSIFICATION & DATA PREP ---
 
-    // 1. Classify Services
-    const serviceTiers = new Map();
+    // 1. Classify Services into Functional Zones
+    const serviceZones = new Map();
+    const serviceTiers = new Map(); // Store tier for color lookup
     Object.entries(services).forEach(([name, svc]) => {
-        serviceTiers.set(name, classifyServiceTier(name, svc));
+        const tier = classifyServiceTier(name, svc);
+        serviceTiers.set(name, tier);
+
+        // Map Tiers to Zones
+        if (tier === 'persistence') serviceZones.set(name, 'persistence');
+        else if (tier === 'routing') serviceZones.set(name, 'gateway');
+        else serviceZones.set(name, 'compute');
     });
 
-    // 2. Collect Ports (Ingress Rail)
+    // 2. Collect Ports (Ingress Zone)
     const allPorts = [];
     Object.entries(services).forEach(([name, svc]) => {
         normalizeArray(svc.ports).forEach((port, idx) => {
@@ -137,16 +144,11 @@ export const generateGraphviz = (state) => {
         });
     });
 
-    // 3. Collect Storage (Storage Rail)
-    const storageNodes = []; // { id, type, label }
-
+    // 3. Collect Storage (Storage Sidecar Zone)
+    const storageNodes = [];
     // Volumes
     Object.keys(volumes).forEach(vName => {
-        storageNodes.push({
-            id: `vol_${sanitizeId(vName)}`,
-            type: 'volume',
-            label: vName
-        });
+        storageNodes.push({ id: `vol_${sanitizeId(vName)}`, type: 'volume', label: vName });
     });
     // Host Paths
     const hostPaths = new Map();
@@ -156,7 +158,6 @@ export const generateGraphviz = (state) => {
             if (src && (src.startsWith('.') || src.startsWith('/'))) {
                 const shortPath = src.length > 20 ? '...' + src.slice(-17) : src;
                 const bsId = btoa(src).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-                // Simple ID collision handling isn't robust here but sufficient for display
                 const id = `hp_${bsId.substring(0, 10)}`;
                 if (!hostPaths.has(id)) {
                     hostPaths.set(id, { id, type: 'hostPath', label: shortPath });
@@ -170,27 +171,66 @@ export const generateGraphviz = (state) => {
     Object.keys(configs).forEach(c => storageNodes.push({ id: `cfg_${sanitizeId(c)}`, type: 'config', label: c }));
 
 
-    // --- PHASE 2: DOT GENERATION ---
+    // --- PHASE 2: DOT GENERATION (Universal Infrastructure Blueprint) ---
 
     let dot = `digraph G {\n`;
     dot += `  bgcolor="transparent"\n`;
-    dot += `  rankdir=LR\n`; // Professional Horizontal Flow
+    dot += `  rankdir=LR\n`; // Horizontal Flow (Left -> Right)
     dot += `  nodesep=0.6\n`;
-    dot += `  ranksep=1.0\n`; // High ranksep for distinct columns
-    dot += `  splines=ortho\n`; // Orthogonal Routing
+    dot += `  ranksep=1.2\n`; // High separation between zones
+    dot += `  splines=ortho\n`; // Strictly Orthogonal Lines
     dot += `  fontname="Inter"\n`;
     dot += `  fontsize=10\n`;
-    dot += `  node [fontname="Inter", fontsize=9, style="filled,rounded", shape=box, pendwidth=1.5]\n`;
-    dot += `  edge [fontname="Inter", fontsize=8, penwidth=1.5]\n`;
+    dot += `  node [fontname="Inter", fontsize=10, style="filled,rounded", shape=box, penwidth=1.5, fixedsize=false, margin="0.2,0.1"]\n`;
+    dot += `  edge [fontname="Inter", fontsize=9, penwidth=1.5, arrowsize=0.8]\n`;
     dot += `  compound=true\n`;
     dot += `  newrank=true\n\n`;
 
-    // 1. INGRESS RAIL (Leftmost)
+    // ---------------------------------------------------------
+    // ZONE TV: STORAGE SIDECAR (Far Right)
+    // Placed first in code but rank=sink forces it to far right
+    // ---------------------------------------------------------
+    if (storageNodes.length > 0) {
+        dot += `  subgraph cluster_storage_sidecar {\n`;
+        dot += `    label="📦 STORAGE & CONFIG"\n`;
+        dot += `    style="dashed,rounded"\n`;
+        dot += `    color="#64748b"\n`;
+        dot += `    fontcolor="#94a3b8"\n`;
+        dot += `    rank=sink\n`; // Enforce Far Right Position
+
+        const storageIds = [];
+        storageNodes.forEach(node => {
+            storageIds.push(node.id);
+            let color = COLORS.volume;
+            let icon = '💾';
+            if (node.type === 'hostPath') { color = COLORS.hostPath; icon = '📁'; }
+            if (node.type === 'secret') { color = COLORS.secret; icon = '🔐'; }
+            if (node.type === 'config') { color = COLORS.config; icon = '⚙️'; }
+
+            dot += `    ${node.id} [\n`;
+            dot += `      label="${icon} ${escapeLabel(node.label)}"\n`;
+            dot += `      shape=folder, style=filled\n`;
+            dot += `      fillcolor="${color.bg}", color="${color.border}", fontcolor="${color.text}"\n`;
+            dot += `      width=1.5\n`; // Standard width for alignment
+            dot += `    ]\n`;
+        });
+
+        // Vertical stacking spine for storage
+        dot += `    { rank=same; ${storageIds[0]} }\n`;
+        for (let i = 0; i < storageIds.length - 1; i++) {
+            dot += `    ${storageIds[i]} -> ${storageIds[i + 1]} [style=invis, weight=10]\n`;
+        }
+        dot += `  }\n\n`;
+    }
+
+    // ---------------------------------------------------------
+    // ZONE I: INGRESS RAIL (Far Left)
+    // ---------------------------------------------------------
     if (allPorts.length > 0) {
-        dot += `  subgraph cluster_ingress {\n`;
-        dot += `    label="⚡ INGRESS"\n`;
+        dot += `  subgraph cluster_ingress_zone {\n`;
+        dot += `    label="⚡ ENTRY"\n`;
         dot += `    style=invis\n`;
-        dot += `    rank=source\n`;
+        dot += `    rank=source\n`; // Force Leftmost Position
 
         const portIds = [];
         allPorts.forEach(p => {
@@ -202,45 +242,41 @@ export const generateGraphviz = (state) => {
             dot += `    ]\n`;
         });
 
-        // Force all ports to be in the same rank (vertical column in LR)
-        dot += `    { rank=same; ${portIds.join('; ')} }\n`;
-
-        // Add invisible edges with constraint=false to encourage vertical ordering without affecting rank
+        // Vertical Alignment Spine
         for (let i = 0; i < portIds.length - 1; i++) {
-            dot += `    ${portIds[i]} -> ${portIds[i + 1]} [style=invis, constraint=false]\n`;
+            dot += `    ${portIds[i]} -> ${portIds[i + 1]} [style=invis, weight=10]\n`;
         }
-
         dot += `  }\n\n`;
     }
 
-    // 2. COMPUTE ZONE (Center)
-    dot += `  subgraph cluster_compute {\n`;
-    dot += `    label="🖥️ COMPUTE ZONE"\n`;
-    dot += `    style="dashed,rounded"\n`;
-    dot += `    color="#475569"\n`;
-    dot += `    fontcolor="#94a3b8"\n`;
-    dot += `    bgcolor="#0f172a"\n`;
-    dot += `    margin=20\n\n`;
+    // ---------------------------------------------------------
+    // NETWORK BOUNDARY (Zones II, III, IV)
+    // ---------------------------------------------------------
 
-    // Group by Network
+    // Group services by primary network for visual boundaries
     const servicesByNetwork = new Map();
-    const serviceToNet = new Map();
     Object.entries(services).forEach(([name, svc]) => {
         const net = normalizeArray(svc.networks)[0] || '_default';
         if (!servicesByNetwork.has(net)) servicesByNetwork.set(net, []);
         servicesByNetwork.get(net).push({ name, svc });
-        serviceToNet.set(name, net);
     });
 
     for (const [netName, netServices] of servicesByNetwork) {
-        dot += `    subgraph cluster_net_${sanitizeId(netName)} {\n`;
-        dot += `      label="🌐 ${escapeLabel(netName)}"\n`;
-        dot += `      style="filled,rounded"\n`;
-        dot += `      color="${COLORS.network.border}"\n`;
-        dot += `      fillcolor="#1e293b"\n`;
-        dot += `      fontcolor="${COLORS.network.text}"\n`;
+        dot += `  subgraph cluster_net_${sanitizeId(netName)} {\n`;
+        dot += `    label="🌐 ${escapeLabel(netName)}"\n`;
+        dot += `    style="filled,rounded"\n`;
+        dot += `    color="${COLORS.network.border}"\n`;
+        dot += `    fillcolor="#1e293b"\n`;
+        dot += `    fontcolor="${COLORS.network.text}"\n`;
+        dot += `    margin=16\n\n`;
+
+        // Bucket services within this network by their Zone
+        const gateways = [];
+        const compute = [];
+        const persistence = [];
 
         netServices.forEach(({ name, svc }) => {
+            const zone = serviceZones.get(name);
             const tier = serviceTiers.get(name);
             const color = COLORS[tier] || COLORS.application;
             const img = svc.image ? svc.image.split(':')[0] : 'image';
@@ -248,92 +284,113 @@ export const generateGraphviz = (state) => {
             // Icon
             let icon = '';
             if (tier === 'persistence') icon = '🛢️ ';
+            else if (tier === 'routing') icon = '🚦 ';
             else if (svc.healthcheck) icon = '💚 ';
 
-            dot += `      ${sanitizeId(name)} [\n`;
-            dot += `        label="${icon}${escapeLabel(name)}\\n<${escapeLabel(img)}>"\n`;
-            dot += `        fillcolor="${color.bg}", color="${color.border}", fontcolor="${color.text}"\n`;
-            dot += `      ]\n`;
+            const nodeDef = `
+                ${sanitizeId(name)} [
+                    label="${icon}${escapeLabel(name)}\\n<${escapeLabel(img)}>"
+                    fillcolor="${color.bg}" color="${color.border}" fontcolor="${color.text}"
+                ]`;
+
+            if (zone === 'gateway') gateways.push(nodeDef);
+            else if (zone === 'persistence') persistence.push(nodeDef);
+            else compute.push(nodeDef);
         });
-        dot += `    }\n`;
+
+        // ZONE II: GATEWAY (Left Edge of Network)
+        if (gateways.length > 0) {
+            dot += `    subgraph cluster_zone_gateway {\n`;
+            dot += `      label="" style=invis\n`; // Invisible grouping
+            dot += `      rank=min\n`; // Pull to left
+            dot += gateways.join('\n');
+            dot += `    }\n`;
+        }
+
+        // ZONE III: COMPUTE (Center of Network)
+        if (compute.length > 0) {
+            dot += `    subgraph cluster_zone_compute {\n`;
+            dot += `      label="" style=invis\n`;
+            // No rank constraint (float center)
+            dot += compute.join('\n');
+            dot += `    }\n`;
+        }
+
+        // ZONE IV: PERSISTENCE (Right Edge of Network)
+        if (persistence.length > 0) {
+            dot += `    subgraph cluster_zone_persistence {\n`;
+            dot += `      label="" style=invis\n`;
+            dot += `      rank=max\n`; // Pull to right within subgraph
+            dot += persistence.join('\n');
+            dot += `    }\n`;
+        }
+
+        dot += `  }\n`; // End Network
     }
-    dot += `  }\n\n`;
 
-    // 3. STORAGE RAIL (Rightmost)
-    if (storageNodes.length > 0) {
-        dot += `  subgraph cluster_storage {\n`;
-        dot += `    label="📦 STORAGE & CONFIG"\n`;
-        dot += `    style="dashed,rounded"\n`;
-        dot += `    color="#64748b"\n`;
-        dot += `    fontcolor="#94a3b8"\n`;
-        dot += `    rank=sink\n`; // Force to far right
 
-        storageNodes.forEach(node => {
-            let color = COLORS.volume;
-            let icon = '💾';
-            if (node.type === 'hostPath') { color = COLORS.hostPath; icon = '📁'; }
-            if (node.type === 'secret') { color = COLORS.secret; icon = '🔐'; }
-            if (node.type === 'config') { color = COLORS.config; icon = '⚙️'; }
+    // --- PHASE 3: SEMANTIC ROUTING ---
 
-            dot += `    ${node.id} [\n`;
-            dot += `      label="${icon} ${escapeLabel(node.label)}"\n`;
-            dot += `      shape=folder, style=filled\n`;
-            dot += `      fillcolor="${color.bg}", color="${color.border}", fontcolor="${color.text}"\n`;
-            dot += `    ]\n`;
-        });
-        dot += `  }\n\n`;
-    }
-
-    // --- PHASE 3: EDGES ---
-
-    // 1. Ingress: Port -> Service
+    // 1. Ingress: Port -> Gateway/Service
     allPorts.forEach(p => {
         dot += `  ${p.id} -> ${p.serviceId} [\n`;
         dot += `    label="${p.protocol}"\n`;
         dot += `    color="${COLORS.edge.traffic}", fontcolor="${COLORS.edge.traffic}"\n`;
-        dot += `    penwidth=2.0\n`;
+        dot += `    penwidth=2.5\n`; // Thicker for main traffic
         dot += `  ]\n`;
     });
 
-    // 2. Service -> Service (Dependencies)
+    // 2. Data Flow: Gateway -> Compute -> Persistence
+    // We infer flow from `depends_on`. 
+    // If App depends on DB, we draw arrow App -> DB (Call Flow).
+    // In LR layout, with Persistence at Right, this naturally flows Left -> Right.
+    // If Gateway depends on App... wait, normally Gateway forwards to App.
+    // We want visually: Gateway --> App --> DB.
+
+    // Explicitly add 'Forwarding' edges if we can infer them? 
+    // Hard without knowing config. We rely on valid `depends_on` or manual links.
+    // But we CAN enforce `depends_on` styling.
+
     Object.entries(services).forEach(([name, svc]) => {
         const srcId = sanitizeId(name);
-        normalizeDependsOn(svc.depends_on).forEach(dep => {
-            if (services[dep]) {
-                // In LR, src -> dep typically means src depends on dep? 
-                // No, dependency arrow usually points Depender -> Dependee (Flow of dependency) 
-                // OR Dependee -> Depender (Flow of data/service readiness).
-                // "runtipi depends on db" -> Arrow usually points from db to runtipi (data flow) or runtipi to db (call flow).
-                // Graphviz `depends_on` we usually draw `dep -> name`.  (DB -> App).
-                // This means DB (Source) -> App (Dest).
-                // In LR, this puts DB on Left, App on Right.
-                // But Professional Tiers says: Proxy -> App -> DB.
-                // So Traffic flows Left to Right.
-                // Dependency is Reverse of Traffic (App calls DB).
-                // So `App -> DB`.
-                // Let's draw `name -> dep` (App -> DB).
+        // Handle both short and long syntax for depends_on
+        const dependsOn = svc.depends_on;
+        let deps = [];
 
-                // WAIT! docker-compose `depends_on`: A depends on B. B starts first.
-                // Visual Traffic: user -> Proxy -> App -> DB.
-                // App calls DB. App -> DB.
-                // So `name -> dep` is correct for Call Graph.
+        if (Array.isArray(dependsOn)) {
+            // Short syntax: ["db", "redis"]
+            deps = dependsOn.map(d => ({ name: d, condition: '' }));
+        } else if (typeof dependsOn === 'object' && dependsOn !== null) {
+            // Long syntax: { db: { condition: "service_healthy" } }
+            deps = Object.entries(dependsOn).map(([d, config]) => ({
+                name: d,
+                condition: config.condition || ''
+            }));
+        }
 
-                const depId = sanitizeId(dep);
+        deps.forEach(dep => {
+            if (services[dep.name]) {
+                const depId = sanitizeId(dep.name);
+                const condition = dep.condition.replace('service_', '');
+
+                let label = '';
+                if (condition) label = `\\n(${condition})`;
+
                 dot += `  ${srcId} -> ${depId} [\n`;
+                dot += `    label="${escapeLabel(label)}"\n`;
                 dot += `    color="${COLORS.edge.network}", style=solid\n`;
+                dot += `    penwidth=1.5\n`;
+                dot += `    fontsize=8\n`;
+                dot += `    fontcolor="${COLORS.edge.network}"\n`;
                 dot += `  ]\n`;
             }
         });
     });
 
-    // 3. Service <-> Storage
-    // Dashed lines entering services from the right side.
-    // LR Layout: Left=Input, Right=Output.
-    // If we want storage on Right, we place it in `rank=sink`.
-    // Edge: `Service -> Storage`.
-    // If we want arrow to point `Storage -> Service` (Data entering service), we use `dir=back`.
-    // Edge: `Service -> Storage [dir=back]`. 
-    // This draws line S--------V, arrow <.
+    // 3. Storage Sidecar Mounts
+    // Dashed lines from Service (Left) to Storage (Right).
+    // Direction: Service -> Storage. 
+    // Visually: Container ----> Volume.
 
     Object.entries(services).forEach(([name, svc]) => {
         const svcId = sanitizeId(name);
@@ -342,45 +399,34 @@ export const generateGraphviz = (state) => {
         normalizeArray(svc.volumes).forEach(vol => {
             const src = typeof vol === 'string' ? vol.split(':')[0] : '';
             let targetId = null;
-            let type = 'volume';
-
-            if (src && volumes[src]) {
-                targetId = `vol_${sanitizeId(src)}`;
-            } else if (src && (src.startsWith('.') || src.startsWith('/'))) {
+            if (src && volumes[src]) targetId = `vol_${sanitizeId(src)}`;
+            else if (src && (src.startsWith('.') || src.startsWith('/'))) {
                 const bsId = btoa(src).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
                 targetId = `hp_${bsId.substring(0, 10)}`;
-                type = 'hostPath';
             }
 
             if (targetId) {
-                // Anchor horizontal alignment?
-                // `constraint=true` (default) keeps them in relative ranks.
-                // `Service -> Target`.
+                // Orthogonal routing for sidecar
                 dot += `  ${svcId} -> ${targetId} [\n`;
-                dot += `    dir=back\n`; // Arrow points to Service
                 dot += `    style=dashed\n`;
                 dot += `    color="${COLORS.edge.data}"\n`;
-                // To force horizontal alignment ("Same horizontal level"), try constraint=true.
-                // Ortho spline will try to make it horizontal if ranks align.
+                // constraint=false lets orthogonal router find path without breaking ranks too much
+                // BUT we want them on right.
                 dot += `  ]\n`;
-                // Horizontal alignment hack:
-                // dot += `  { rank=same; ${svcId}; ${targetId} }\n`; 
-                // Be careful with rank=same across subgraphs.
             }
         });
 
         // Secrets/Configs
-        // ... similar logic ...
         normalizeArray(svc.secrets).forEach(s => {
             const t = typeof s === 'string' ? s : s.source;
             if (secrets[t]) {
-                dot += `  ${svcId} -> sec_${sanitizeId(t)} [dir=back, style=dotted, color="${COLORS.edge.config}"]\n`;
+                dot += `  ${svcId} -> sec_${sanitizeId(t)} [style=dotted, color="${COLORS.edge.config}"]\n`;
             }
         });
         normalizeArray(svc.configs).forEach(c => {
             const t = typeof c === 'string' ? c : c.source;
             if (configs[t]) {
-                dot += `  ${svcId} -> cfg_${sanitizeId(t)} [dir=back, style=dotted, color="${COLORS.edge.config}"]\n`;
+                dot += `  ${svcId} -> cfg_${sanitizeId(t)} [style=dotted, color="${COLORS.edge.config}"]\n`;
             }
         });
     });
