@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, memo } from 'react';
-import mermaid from 'mermaid';
+import { Graphviz } from '@hpcc-js/wasm-graphviz';
 import { Upload, AlertCircle, Trash2, ZoomIn, ZoomOut, RotateCcw, AlertTriangle, Info, XCircle } from 'lucide-react';
 import { useMultiProject } from '../hooks/useMultiProject';
 import { compareProjects, getComparisonSummary } from '../utils/comparison';
-import { generateMultiProjectGraph } from '../utils/mermaid';
+import { generateMultiProjectGraphviz } from '../utils/graphviz';
 
 // Conflict Panel Component
 const ConflictPanel = ({ results }) => {
@@ -95,7 +95,16 @@ const ConflictPanel = ({ results }) => {
     );
 };
 
-// Multi-Project Diagram with mermaid rendering
+// Cache the Graphviz instance
+let graphvizInstance = null;
+const getGraphviz = async () => {
+    if (!graphvizInstance) {
+        graphvizInstance = await Graphviz.load();
+    }
+    return graphvizInstance;
+};
+
+// Multi-Project Diagram with Graphviz rendering
 const MultiProjectDiagram = memo(({ projects, conflicts }) => {
     const containerRef = useRef(null);
     const [scale, setScale] = useState(0.8);
@@ -103,18 +112,31 @@ const MultiProjectDiagram = memo(({ projects, conflicts }) => {
     const [dragging, setDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const render = async () => {
             if (!containerRef.current) return;
             try {
                 setError(null);
-                const graph = generateMultiProjectGraph(projects, conflicts);
-                const id = `mermaid-multi-${Date.now()}`;
-                const { svg } = await mermaid.render(id, graph);
+                setLoading(true);
+                const dot = generateMultiProjectGraphviz(projects, conflicts);
+                const graphviz = await getGraphviz();
+                const svg = graphviz.dot(dot);
                 containerRef.current.innerHTML = svg;
+
+                // Style the SVG
+                const svgElement = containerRef.current.querySelector('svg');
+                if (svgElement) {
+                    svgElement.style.width = '100%';
+                    svgElement.style.height = '100%';
+                    svgElement.style.maxWidth = 'none';
+                    svgElement.style.maxHeight = 'none';
+                }
+                setLoading(false);
             } catch (e) {
                 setError(e.message);
+                setLoading(false);
             }
         };
         render();

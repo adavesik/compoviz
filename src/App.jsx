@@ -9,7 +9,7 @@ import { Analytics } from '@vercel/analytics/react';
 // Utilities and Hooks
 import { generateYaml, parseYaml } from './utils/yaml';
 import { validateState } from './utils/validation';
-import { generateMermaidGraph } from './utils/mermaid';
+import { generateGraphviz } from './utils/graphviz';
 import { ComposeContext, composeReducer, initialState } from './hooks/useCompose';
 import { useHistoryReducer } from './hooks/useHistory';
 import { serviceTemplates } from './data/templates';
@@ -20,7 +20,7 @@ import { IconButton } from './components/ui';
 // Feature Components
 import { ServiceEditor, NetworkEditor, VolumeEditor, SecretEditor, ConfigEditor } from './features/editor';
 import { ResourceTree, IssuesPanel } from './features/sidebar';
-import { MermaidDiagram } from './features/diagram';
+import { GraphvizDiagram } from './features/diagram';
 import { CodePreview } from './features/code-preview';
 import { TemplateModal } from './components/modals';
 import CompareView from './components/CompareView';
@@ -240,7 +240,7 @@ export default function App() {
     }
   };
 
-  const mermaidGraph = generateMermaidGraph(state);
+  const graphvizDot = generateGraphviz(state);
 
   return (
     <ComposeContext.Provider value={{ state, dispatch }}>
@@ -369,7 +369,7 @@ export default function App() {
               /* Diagram View (Mermaid - read-only) */
               <div className="flex-1 p-4">
                 <div className="h-full glass rounded-xl overflow-hidden">
-                  <MermaidDiagram graph={mermaidGraph} onNodeClick={setSelected} onAdd={handleAdd} />
+                  <GraphvizDiagram dot={graphvizDot} onNodeClick={setSelected} onAdd={handleAdd} />
                 </div>
               </div>
             )}

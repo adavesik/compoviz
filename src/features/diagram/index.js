@@ -1,5 +1,3 @@
-/**
- * Diagram components barrel export
- */
-export { MermaidDiagram } from './MermaidDiagram';
+// Diagram components and utilities
+export { GraphvizDiagram } from './GraphvizDiagram';
 export { ContextMenu } from './ContextMenu';

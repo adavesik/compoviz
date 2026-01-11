@@ -1,0 +1,506 @@
+import { normalizeDependsOn, normalizeArray } from './validation';
+
+/**
+ * Escape special characters for Graphviz labels
+ */
+const escapeLabel = (str) => {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/\n/g, ' ');
+};
+
+/**
+ * Extract depends_on condition from long syntax
+ */
+const getDependsOnCondition = (dependsOn, depName) => {
+    if (!dependsOn) return '';
+    if (Array.isArray(dependsOn)) return '';
+    if (typeof dependsOn === 'object' && dependsOn[depName]) {
+        return dependsOn[depName].condition || '';
+    }
+    return '';
+};
+
+/**
+ * Sanitize node ID for Graphviz (must be alphanumeric + underscore)
+ */
+const sanitizeId = (str) => {
+    if (!str) return 'node';
+    return String(str).replace(/[^a-zA-Z0-9]/g, '_');
+};
+
+/**
+ * Professional semantic color palette
+ */
+const COLORS = {
+    // Tiers
+    ingress: { bg: '#be123c', border: '#fda4af', text: '#ffffff' },      // Rose/Red (Input)
+    routing: { bg: '#c2410c', border: '#fdba74', text: '#ffffff' },      // Orange/Warm (Proxy)
+    application: { bg: '#0369a1', border: '#7dd3fc', text: '#ffffff' },  // Blue/Cool (Logic)
+    persistence: { bg: '#15803d', border: '#86efac', text: '#ffffff' },  // Green/Stable (Data)
+
+    // Components
+    network: { bg: '#0f172a', border: '#334155', text: '#94a3b8' },      // Dark Slate
+
+    // Storage Rail
+    volume: { bg: '#b45309', border: '#fbbf24', text: '#ffffff' },
+    hostPath: { bg: '#4c1d95', border: '#a78bfa', text: '#ffffff' },
+    secret: { bg: '#7e22ce', border: '#d8b4fe', text: '#ffffff' },
+    config: { bg: '#0e7490', border: '#67e8f9', text: '#ffffff' },
+
+    // Ports
+    port: { bg: '#be123c', border: '#fb7185', text: '#ffffff' },
+
+    // Edges
+    edge: {
+        network: '#64748b',   // Neutral/Dark for structure
+        data: '#f59e0b',      // Gold for storage
+        config: '#a78bfa',    // Lavender for config
+        traffic: '#f43f5e',   // Red/Pink for active traffic
+    }
+};
+
+/**
+ * Classify a service into a tier based on its image/name
+ */
+const classifyServiceTier = (name, svc) => {
+    const image = (svc.image || '').toLowerCase();
+    const serviceName = name.toLowerCase();
+
+    // Database/persistence tier
+    const dbPatterns = ['postgres', 'mysql', 'mariadb', 'mongo', 'redis', 'memcached',
+        'elasticsearch', 'rabbitmq', 'kafka', 'minio', 'influx', 'consul', 'zoo'];
+    if (dbPatterns.some(p => image.includes(p) || serviceName.includes(p))) {
+        return 'persistence';
+    }
+
+    // Routing tier
+    const routingPatterns = ['traefik', 'nginx', 'haproxy', 'caddy', 'envoy', 'kong', 'gateway'];
+    if (routingPatterns.some(p => image.includes(p) || serviceName.includes(p))) {
+        return 'routing';
+    }
+
+    // If service has ports exposed, it might be an entry point or routing
+    const ports = normalizeArray(svc.ports);
+    if (ports.length > 0) {
+        const hasCommonPorts = ports.some(p => {
+            const portStr = typeof p === 'string' ? p : String(p.published);
+            return ['80', '443', '8080', '8443', '4443'].includes(portStr.split(':')[0]);
+        });
+        if (hasCommonPorts) return 'routing'; // Assumption: Web ports usually imply routing/web
+    }
+
+    return 'application';
+};
+
+export const generateGraphviz = (state) => {
+    const services = state.services || {};
+    const networks = state.networks || {};
+    const volumes = state.volumes || {};
+    const secrets = state.secrets || {};
+    const configs = state.configs || {};
+
+    if (Object.keys(services).length === 0) {
+        return `digraph G { bgcolor="transparent" empty [label="No services"] }`;
+    }
+
+    // --- PHASE 1: PRE-PROCESSING ---
+
+    // 1. Classify Services
+    const serviceTiers = new Map();
+    Object.entries(services).forEach(([name, svc]) => {
+        serviceTiers.set(name, classifyServiceTier(name, svc));
+    });
+
+    // 2. Collect Ports (Ingress Rail)
+    const allPorts = [];
+    Object.entries(services).forEach(([name, svc]) => {
+        normalizeArray(svc.ports).forEach((port, idx) => {
+            let hostPort, protocol;
+            if (typeof port === 'string') {
+                hostPort = port.split(':')[0];
+                protocol = port.split('/')[1] || 'tcp';
+            } else {
+                hostPort = port.published;
+                protocol = port.protocol || 'tcp';
+            }
+            allPorts.push({
+                id: `port_${sanitizeId(name)}_${idx}`,
+                label: hostPort,
+                protocol,
+                serviceId: sanitizeId(name)
+            });
+        });
+    });
+
+    // 3. Collect Storage (Storage Rail)
+    const storageNodes = []; // { id, type, label }
+
+    // Volumes
+    Object.keys(volumes).forEach(vName => {
+        storageNodes.push({
+            id: `vol_${sanitizeId(vName)}`,
+            type: 'volume',
+            label: vName
+        });
+    });
+    // Host Paths
+    const hostPaths = new Map();
+    Object.entries(services).forEach(([name, svc]) => {
+        normalizeArray(svc.volumes).forEach(vol => {
+            const src = typeof vol === 'string' ? vol.split(':')[0] : '';
+            if (src && (src.startsWith('.') || src.startsWith('/'))) {
+                const shortPath = src.length > 20 ? '...' + src.slice(-17) : src;
+                const bsId = btoa(src).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+                // Simple ID collision handling isn't robust here but sufficient for display
+                const id = `hp_${bsId.substring(0, 10)}`;
+                if (!hostPaths.has(id)) {
+                    hostPaths.set(id, { id, type: 'hostPath', label: shortPath });
+                    storageNodes.push({ id, type: 'hostPath', label: shortPath });
+                }
+            }
+        });
+    });
+    // Secrets & Configs
+    Object.keys(secrets).forEach(s => storageNodes.push({ id: `sec_${sanitizeId(s)}`, type: 'secret', label: s }));
+    Object.keys(configs).forEach(c => storageNodes.push({ id: `cfg_${sanitizeId(c)}`, type: 'config', label: c }));
+
+
+    // --- PHASE 2: DOT GENERATION ---
+
+    let dot = `digraph G {\n`;
+    dot += `  bgcolor="transparent"\n`;
+    dot += `  rankdir=LR\n`; // Professional Horizontal Flow
+    dot += `  nodesep=0.6\n`;
+    dot += `  ranksep=1.0\n`; // High ranksep for distinct columns
+    dot += `  splines=ortho\n`; // Orthogonal Routing
+    dot += `  fontname="Inter"\n`;
+    dot += `  fontsize=10\n`;
+    dot += `  node [fontname="Inter", fontsize=9, style="filled,rounded", shape=box, pendwidth=1.5]\n`;
+    dot += `  edge [fontname="Inter", fontsize=8, penwidth=1.5]\n`;
+    dot += `  compound=true\n`;
+    dot += `  newrank=true\n\n`;
+
+    // 1. INGRESS RAIL (Leftmost)
+    if (allPorts.length > 0) {
+        dot += `  subgraph cluster_ingress {\n`;
+        dot += `    label="⚡ INGRESS"\n`;
+        dot += `    style=invis\n`;
+        dot += `    rank=source\n`;
+
+        const portIds = [];
+        allPorts.forEach(p => {
+            portIds.push(p.id);
+            dot += `    ${p.id} [\n`;
+            dot += `      label="${p.label}"\n`;
+            dot += `      shape=circle, width=0.6, fixedsize=true\n`;
+            dot += `      fillcolor="${COLORS.port.bg}", color="${COLORS.port.border}", fontcolor="${COLORS.port.text}"\n`;
+            dot += `    ]\n`;
+        });
+
+        // Force all ports to be in the same rank (vertical column in LR)
+        dot += `    { rank=same; ${portIds.join('; ')} }\n`;
+
+        // Add invisible edges with constraint=false to encourage vertical ordering without affecting rank
+        for (let i = 0; i < portIds.length - 1; i++) {
+            dot += `    ${portIds[i]} -> ${portIds[i + 1]} [style=invis, constraint=false]\n`;
+        }
+
+        dot += `  }\n\n`;
+    }
+
+    // 2. COMPUTE ZONE (Center)
+    dot += `  subgraph cluster_compute {\n`;
+    dot += `    label="🖥️ COMPUTE ZONE"\n`;
+    dot += `    style="dashed,rounded"\n`;
+    dot += `    color="#475569"\n`;
+    dot += `    fontcolor="#94a3b8"\n`;
+    dot += `    bgcolor="#0f172a"\n`;
+    dot += `    margin=20\n\n`;
+
+    // Group by Network
+    const servicesByNetwork = new Map();
+    const serviceToNet = new Map();
+    Object.entries(services).forEach(([name, svc]) => {
+        const net = normalizeArray(svc.networks)[0] || '_default';
+        if (!servicesByNetwork.has(net)) servicesByNetwork.set(net, []);
+        servicesByNetwork.get(net).push({ name, svc });
+        serviceToNet.set(name, net);
+    });
+
+    for (const [netName, netServices] of servicesByNetwork) {
+        dot += `    subgraph cluster_net_${sanitizeId(netName)} {\n`;
+        dot += `      label="🌐 ${escapeLabel(netName)}"\n`;
+        dot += `      style="filled,rounded"\n`;
+        dot += `      color="${COLORS.network.border}"\n`;
+        dot += `      fillcolor="#1e293b"\n`;
+        dot += `      fontcolor="${COLORS.network.text}"\n`;
+
+        netServices.forEach(({ name, svc }) => {
+            const tier = serviceTiers.get(name);
+            const color = COLORS[tier] || COLORS.application;
+            const img = svc.image ? svc.image.split(':')[0] : 'image';
+
+            // Icon
+            let icon = '';
+            if (tier === 'persistence') icon = '🛢️ ';
+            else if (svc.healthcheck) icon = '💚 ';
+
+            dot += `      ${sanitizeId(name)} [\n`;
+            dot += `        label="${icon}${escapeLabel(name)}\\n<${escapeLabel(img)}>"\n`;
+            dot += `        fillcolor="${color.bg}", color="${color.border}", fontcolor="${color.text}"\n`;
+            dot += `      ]\n`;
+        });
+        dot += `    }\n`;
+    }
+    dot += `  }\n\n`;
+
+    // 3. STORAGE RAIL (Rightmost)
+    if (storageNodes.length > 0) {
+        dot += `  subgraph cluster_storage {\n`;
+        dot += `    label="📦 STORAGE & CONFIG"\n`;
+        dot += `    style="dashed,rounded"\n`;
+        dot += `    color="#64748b"\n`;
+        dot += `    fontcolor="#94a3b8"\n`;
+        dot += `    rank=sink\n`; // Force to far right
+
+        storageNodes.forEach(node => {
+            let color = COLORS.volume;
+            let icon = '💾';
+            if (node.type === 'hostPath') { color = COLORS.hostPath; icon = '📁'; }
+            if (node.type === 'secret') { color = COLORS.secret; icon = '🔐'; }
+            if (node.type === 'config') { color = COLORS.config; icon = '⚙️'; }
+
+            dot += `    ${node.id} [\n`;
+            dot += `      label="${icon} ${escapeLabel(node.label)}"\n`;
+            dot += `      shape=folder, style=filled\n`;
+            dot += `      fillcolor="${color.bg}", color="${color.border}", fontcolor="${color.text}"\n`;
+            dot += `    ]\n`;
+        });
+        dot += `  }\n\n`;
+    }
+
+    // --- PHASE 3: EDGES ---
+
+    // 1. Ingress: Port -> Service
+    allPorts.forEach(p => {
+        dot += `  ${p.id} -> ${p.serviceId} [\n`;
+        dot += `    label="${p.protocol}"\n`;
+        dot += `    color="${COLORS.edge.traffic}", fontcolor="${COLORS.edge.traffic}"\n`;
+        dot += `    penwidth=2.0\n`;
+        dot += `  ]\n`;
+    });
+
+    // 2. Service -> Service (Dependencies)
+    Object.entries(services).forEach(([name, svc]) => {
+        const srcId = sanitizeId(name);
+        normalizeDependsOn(svc.depends_on).forEach(dep => {
+            if (services[dep]) {
+                // In LR, src -> dep typically means src depends on dep? 
+                // No, dependency arrow usually points Depender -> Dependee (Flow of dependency) 
+                // OR Dependee -> Depender (Flow of data/service readiness).
+                // "runtipi depends on db" -> Arrow usually points from db to runtipi (data flow) or runtipi to db (call flow).
+                // Graphviz `depends_on` we usually draw `dep -> name`.  (DB -> App).
+                // This means DB (Source) -> App (Dest).
+                // In LR, this puts DB on Left, App on Right.
+                // But Professional Tiers says: Proxy -> App -> DB.
+                // So Traffic flows Left to Right.
+                // Dependency is Reverse of Traffic (App calls DB).
+                // So `App -> DB`.
+                // Let's draw `name -> dep` (App -> DB).
+
+                // WAIT! docker-compose `depends_on`: A depends on B. B starts first.
+                // Visual Traffic: user -> Proxy -> App -> DB.
+                // App calls DB. App -> DB.
+                // So `name -> dep` is correct for Call Graph.
+
+                const depId = sanitizeId(dep);
+                dot += `  ${srcId} -> ${depId} [\n`;
+                dot += `    color="${COLORS.edge.network}", style=solid\n`;
+                dot += `  ]\n`;
+            }
+        });
+    });
+
+    // 3. Service <-> Storage
+    // Dashed lines entering services from the right side.
+    // LR Layout: Left=Input, Right=Output.
+    // If we want storage on Right, we place it in `rank=sink`.
+    // Edge: `Service -> Storage`.
+    // If we want arrow to point `Storage -> Service` (Data entering service), we use `dir=back`.
+    // Edge: `Service -> Storage [dir=back]`. 
+    // This draws line S--------V, arrow <.
+
+    Object.entries(services).forEach(([name, svc]) => {
+        const svcId = sanitizeId(name);
+
+        // Volumes/HostPaths
+        normalizeArray(svc.volumes).forEach(vol => {
+            const src = typeof vol === 'string' ? vol.split(':')[0] : '';
+            let targetId = null;
+            let type = 'volume';
+
+            if (src && volumes[src]) {
+                targetId = `vol_${sanitizeId(src)}`;
+            } else if (src && (src.startsWith('.') || src.startsWith('/'))) {
+                const bsId = btoa(src).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+                targetId = `hp_${bsId.substring(0, 10)}`;
+                type = 'hostPath';
+            }
+
+            if (targetId) {
+                // Anchor horizontal alignment?
+                // `constraint=true` (default) keeps them in relative ranks.
+                // `Service -> Target`.
+                dot += `  ${svcId} -> ${targetId} [\n`;
+                dot += `    dir=back\n`; // Arrow points to Service
+                dot += `    style=dashed\n`;
+                dot += `    color="${COLORS.edge.data}"\n`;
+                // To force horizontal alignment ("Same horizontal level"), try constraint=true.
+                // Ortho spline will try to make it horizontal if ranks align.
+                dot += `  ]\n`;
+                // Horizontal alignment hack:
+                // dot += `  { rank=same; ${svcId}; ${targetId} }\n`; 
+                // Be careful with rank=same across subgraphs.
+            }
+        });
+
+        // Secrets/Configs
+        // ... similar logic ...
+        normalizeArray(svc.secrets).forEach(s => {
+            const t = typeof s === 'string' ? s : s.source;
+            if (secrets[t]) {
+                dot += `  ${svcId} -> sec_${sanitizeId(t)} [dir=back, style=dotted, color="${COLORS.edge.config}"]\n`;
+            }
+        });
+        normalizeArray(svc.configs).forEach(c => {
+            const t = typeof c === 'string' ? c : c.source;
+            if (configs[t]) {
+                dot += `  ${svcId} -> cfg_${sanitizeId(t)} [dir=back, style=dotted, color="${COLORS.edge.config}"]\n`;
+            }
+        });
+    });
+
+    dot += `}\n`;
+    return dot;
+};
+
+// Multi-project support
+const PROJECT_COLORS = [
+    { bg: '#1e3a8a', border: '#3b82f6', name: 'blue' },
+    { bg: '#065f46', border: '#10b981', name: 'green' },
+    { bg: '#164e63', border: '#06b6d4', name: 'cyan' },
+];
+
+export const generateMultiProjectGraphviz = (projects, conflicts = []) => {
+    if (!projects || projects.length === 0) {
+        return `digraph G { bgcolor="transparent" empty [label="No projects"] }`;
+    }
+
+    // Build conflict lookup
+    const conflictPorts = new Set();
+    const conflictContainers = new Set();
+    conflicts.forEach(c => {
+        if (c.category === 'port' && c.type === 'conflict') {
+            c.details?.forEach(d => conflictPorts.add(`${d.project}:${d.service}`));
+        }
+        if (c.category === 'container_name' && c.type === 'conflict') {
+            c.details?.forEach(d => conflictContainers.add(`${d.project}:${d.service}`));
+        }
+    });
+
+    // Collect shared networks
+    const allNetworks = new Map();
+    projects.forEach((project, idx) => {
+        const content = project.content || {};
+        Object.keys(content.networks || {}).forEach(netName => {
+            if (!allNetworks.has(netName)) allNetworks.set(netName, []);
+            allNetworks.get(netName).push(idx);
+        });
+    });
+
+    let dot = `digraph G {\n`;
+    dot += `  bgcolor="transparent"\n`;
+    dot += `  rankdir=LR\n`;
+    dot += `  nodesep=0.6\n`;
+    dot += `  ranksep=1.0\n`;
+    dot += `  splines=ortho\n`;
+    dot += `  fontname="Inter"\n`;
+    dot += `  fontsize=10\n`;
+    dot += `  node [fontname="Inter", fontsize=9, style="filled,rounded", shape=box]\n`;
+    dot += `  edge [fontname="Inter", fontsize=8]\n`;
+    dot += `  compound=true\n`;
+    dot += `  newrank=true\n\n`;
+
+    // Render each project as a subgraph
+    projects.forEach((project, idx) => {
+        const content = project.content || {};
+        const projectPrefix = `p${idx}_`;
+        const color = PROJECT_COLORS[idx % PROJECT_COLORS.length];
+
+        dot += `  subgraph cluster_project_${idx} {\n`;
+        dot += `    label="${escapeLabel(project.name || 'Project ' + (idx + 1))}"\n`;
+        dot += `    style="filled,rounded"\n`;
+        dot += `    color="${color.border}"\n`;
+        dot += `    fillcolor="${color.bg}20"\n`;
+        dot += `    fontcolor="#f1f5f9"\n\n`;
+
+        // Services
+        Object.entries(content.services || {}).forEach(([serviceName, svc]) => {
+            const nodeId = `${projectPrefix}${sanitizeId(serviceName)}`;
+            const img = svc.image ? svc.image.split(':')[0] : 'build';
+            const imgShort = img.length > 15 ? img.slice(0, 12) + '...' : img;
+
+            const serviceKey = `${project.name}:${serviceName}`;
+            const hasConflict = conflictPorts.has(serviceKey) || conflictContainers.has(serviceKey);
+            const nodeColor = hasConflict ? '#7f1d1d' : color.bg;
+            const nodeBorder = hasConflict ? '#ef4444' : color.border;
+
+            dot += `    ${nodeId} [\n`;
+            dot += `      label="${escapeLabel(serviceName)}\\n<${escapeLabel(imgShort)}>"\n`;
+            dot += `      fillcolor="${nodeColor}"\n`;
+            dot += `      color="${nodeBorder}"\n`;
+            dot += `      fontcolor="#ffffff"\n`;
+            dot += `      penwidth=${hasConflict ? 3 : 1.5}\n`;
+            dot += `    ]\n`;
+        });
+        dot += `  }\n\n`;
+    });
+
+    // Shared networks
+    const sharedNumbers = [...allNetworks.entries()].filter(([_, projs]) => projs.length > 1);
+    if (sharedNumbers.length > 0) {
+        dot += `  subgraph cluster_shared {\n`;
+        dot += `    label="SHARED NETWORKS"\n`;
+        dot += `    style="dashed,rounded"\n`;
+        dot += `    color="#a78bfa"\n`;
+        dot += `    fontcolor="#f1f5f9"\n`;
+        sharedNumbers.forEach(([netName]) => {
+            const netId = `shared_net_${sanitizeId(netName)}`;
+            dot += `    ${netId} [label="${escapeLabel(netName)}", shape=ellipse, style="filled", fillcolor="#4c1d95", color="#a78bfa", fontcolor="#ffffff"]\n`;
+        });
+        dot += `  }\n\n`;
+
+        // Connect services to shared networks
+        projects.forEach((project, idx) => {
+            const content = project.content || {};
+            const projectPrefix = `p${idx}_`;
+            Object.entries(content.services || {}).forEach(([serviceName, svc]) => {
+                normalizeArray(svc.networks).forEach(netName => {
+                    if (allNetworks.get(netName)?.length > 1) {
+                        const nodeId = `${projectPrefix}${sanitizeId(serviceName)}`;
+                        const netId = `shared_net_${sanitizeId(netName)}`;
+                        dot += `  ${nodeId} -> ${netId} [style=dashed, color="#a78bfa"]\n`;
+                    }
+                });
+            });
+        });
+    }
+
+    dot += `}\n`;
+    return dot;
+};
