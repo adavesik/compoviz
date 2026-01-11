@@ -7,6 +7,7 @@ class GraphvizWorkerClient {
         this.queue = Promise.resolve();
         this.requestId = 0;
         this.pending = new Map();
+        this.timeoutMs = 10000;
     }
 
     ensureWorker() {
@@ -71,7 +72,24 @@ class GraphvizWorkerClient {
         const worker = this.ensureWorker();
         const id = ++this.requestId;
         return new Promise((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
+            const timeoutId = setTimeout(() => {
+                if (!this.pending.has(id)) return;
+                this.pending.delete(id);
+                const err = new Error('Graphviz render timed out');
+                err.fatal = true;
+                this.resetWorker();
+                reject(err);
+            }, this.timeoutMs);
+            this.pending.set(id, {
+                resolve: (value) => {
+                    clearTimeout(timeoutId);
+                    resolve(value);
+                },
+                reject: (error) => {
+                    clearTimeout(timeoutId);
+                    reject(error);
+                },
+            });
             worker.postMessage({ id, dot });
         });
     }

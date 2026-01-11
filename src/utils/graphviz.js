@@ -260,6 +260,10 @@ export const generateGraphviz = (state) => {
         if (!servicesByNetwork.has(net)) servicesByNetwork.set(net, []);
         servicesByNetwork.get(net).push({ name, svc });
     });
+    // Ensure standalone networks still render in the diagram
+    Object.keys(networks).forEach(netName => {
+        if (!servicesByNetwork.has(netName)) servicesByNetwork.set(netName, []);
+    });
 
     for (const [netName, netServices] of servicesByNetwork) {
         dot += `  subgraph cluster_net_${sanitizeId(netName)} {\n`;
@@ -323,6 +327,18 @@ export const generateGraphviz = (state) => {
             dot += `      rank=max\n`; // Pull to right within subgraph
             dot += persistence.join('\n');
             dot += `    }\n`;
+        }
+
+        if (netServices.length === 0) {
+            const netId = `net_${sanitizeId(netName)}_empty`;
+            dot += `    ${netId} [\n`;
+            dot += `      label="(empty network)"\n`;
+            dot += `      shape=ellipse\n`;
+            dot += `      style="filled"\n`;
+            dot += `      fillcolor="${COLORS.network.bg}"\n`;
+            dot += `      color="${COLORS.network.border}"\n`;
+            dot += `      fontcolor="${COLORS.network.text}"\n`;
+            dot += `    ]\n`;
         }
 
         dot += `  }\n`; // End Network
