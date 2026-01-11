@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, memo } from 'react';
-import { Graphviz } from '@hpcc-js/wasm-graphviz';
 import { Upload, AlertCircle, Trash2, ZoomIn, ZoomOut, RotateCcw, AlertTriangle, Info, XCircle } from 'lucide-react';
 import { useMultiProject } from '../hooks/useMultiProject';
 import { compareProjects, getComparisonSummary } from '../utils/comparison';
 import { generateMultiProjectGraphviz } from '../utils/graphviz';
+import { renderDot, resetGraphviz } from '../utils/graphvizRenderer';
 
 // Conflict Panel Component
 const ConflictPanel = ({ results }) => {
@@ -95,15 +95,6 @@ const ConflictPanel = ({ results }) => {
     );
 };
 
-// Cache the Graphviz instance
-let graphvizInstance = null;
-const getGraphviz = async () => {
-    if (!graphvizInstance) {
-        graphvizInstance = await Graphviz.load();
-    }
-    return graphvizInstance;
-};
-
 // Multi-Project Diagram with Graphviz rendering
 const MultiProjectDiagram = memo(({ projects, conflicts }) => {
     const containerRef = useRef(null);
@@ -115,14 +106,15 @@ const MultiProjectDiagram = memo(({ projects, conflicts }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let cancelled = false;
         const render = async () => {
             if (!containerRef.current) return;
             try {
                 setError(null);
                 setLoading(true);
                 const dot = generateMultiProjectGraphviz(projects, conflicts);
-                const graphviz = await getGraphviz();
-                const svg = graphviz.dot(dot);
+                const svg = await renderDot(dot);
+                if (cancelled || !containerRef.current) return;
                 containerRef.current.innerHTML = svg;
 
                 // Style the SVG
@@ -133,14 +125,24 @@ const MultiProjectDiagram = memo(({ projects, conflicts }) => {
                     svgElement.style.maxWidth = 'none';
                     svgElement.style.maxHeight = 'none';
                 }
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             } catch (e) {
+                if (cancelled) return;
                 setError(e.message);
                 setLoading(false);
             }
         };
         render();
+        return () => {
+            cancelled = true;
+        };
     }, [projects, conflicts]);
+
+    useEffect(() => {
+        return () => {
+            resetGraphviz();
+        };
+    }, []);
 
     const handleMouseDown = (e) => { setDragging(true); setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y }); };
     const handleMouseMove = (e) => { if (dragging) setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }); };

@@ -1,17 +1,8 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, AlertCircle, Download, Maximize } from 'lucide-react';
-import { Graphviz } from '@hpcc-js/wasm-graphviz';
 import { IconButton } from '../../components/ui';
 import ContextMenu from './ContextMenu';
-
-// Cache the Graphviz instance
-let graphvizInstance = null;
-const getGraphviz = async () => {
-    if (!graphvizInstance) {
-        graphvizInstance = await Graphviz.load();
-    }
-    return graphvizInstance;
-};
+import { renderDot, resetGraphviz } from '../../utils/graphvizRenderer';
 
 /**
  * Graphviz diagram with pan/zoom and right-click context menu
@@ -29,13 +20,14 @@ export const GraphvizDiagram = memo(({ dot, onNodeClick, onAdd }) => {
 
     // Render DOT to SVG
     useEffect(() => {
+        let cancelled = false;
         const render = async () => {
             if (!containerRef.current || !dot) return;
             try {
                 setError(null);
                 setLoading(true);
-                const graphviz = await getGraphviz();
-                const svg = graphviz.dot(dot);
+                const svg = await renderDot(dot);
+                if (cancelled || !containerRef.current) return;
                 containerRef.current.innerHTML = svg;
                 svgRef.current = containerRef.current.querySelector('svg');
 
@@ -61,14 +53,24 @@ export const GraphvizDiagram = memo(({ dot, onNodeClick, onAdd }) => {
                         });
                     });
                 }
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             } catch (e) {
+                if (cancelled) return;
                 setError(e.message);
                 setLoading(false);
             }
         };
         render();
+        return () => {
+            cancelled = true;
+        };
     }, [dot, onNodeClick]);
+
+    useEffect(() => {
+        return () => {
+            resetGraphviz();
+        };
+    }, []);
 
     // Pan handlers
     const handleMouseDown = (e) => {
