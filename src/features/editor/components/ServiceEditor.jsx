@@ -7,7 +7,7 @@ import { normalizeDependsOn, normalizeArray } from '../../../utils/validation';
  * Service configuration editor
  * Handles all Docker Compose service configuration options
  */
-export const ServiceEditor = ({ name, service, onUpdate, allNetworks, allServices, allVolumes, errors = [] }) => {
+export const ServiceEditor = ({ name, service, onUpdate, allNetworks, allServices, errors = [] }) => {
     const update = (field, value) => onUpdate({ ...service, [field]: value });
 
     const updateNested = (path, value) => {

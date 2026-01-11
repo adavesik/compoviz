@@ -1,4 +1,4 @@
-import { normalizeDependsOn, normalizeArray } from './validation';
+import { normalizeArray } from './validation';
 
 /**
  * Escape special characters for Graphviz labels
@@ -16,14 +16,7 @@ const escapeLabel = (str) => {
 /**
  * Extract depends_on condition from long syntax
  */
-const getDependsOnCondition = (dependsOn, depName) => {
-    if (!dependsOn) return '';
-    if (Array.isArray(dependsOn)) return '';
-    if (typeof dependsOn === 'object' && dependsOn[depName]) {
-        return dependsOn[depName].condition || '';
-    }
-    return '';
-};
+
 
 /**
  * Sanitize node ID for Graphviz (must be alphanumeric + underscore)
@@ -152,7 +145,7 @@ export const generateGraphviz = (state) => {
     });
     // Host Paths
     const hostPaths = new Map();
-    Object.entries(services).forEach(([name, svc]) => {
+    Object.entries(services).forEach(([, svc]) => {
         normalizeArray(svc.volumes).forEach(vol => {
             const src = typeof vol === 'string' ? vol.split(':')[0] : '';
             if (src && (src.startsWith('.') || src.startsWith('/'))) {
@@ -357,13 +350,13 @@ export const generateGraphviz = (state) => {
     });
 
     // 2. Data Flow: Gateway -> Compute -> Persistence
-    // We infer flow from `depends_on`. 
+    // We infer flow from `depends_on`.
     // If App depends on DB, we draw arrow App -> DB (Call Flow).
     // In LR layout, with Persistence at Right, this naturally flows Left -> Right.
     // If Gateway depends on App... wait, normally Gateway forwards to App.
     // We want visually: Gateway --> App --> DB.
 
-    // Explicitly add 'Forwarding' edges if we can infer them? 
+    // Explicitly add 'Forwarding' edges if we can infer them?
     // Hard without knowing config. We rely on valid `depends_on` or manual links.
     // But we CAN enforce `depends_on` styling.
 
@@ -405,7 +398,7 @@ export const generateGraphviz = (state) => {
 
     // 3. Storage Sidecar Mounts
     // Dashed lines from Service (Left) to Storage (Right).
-    // Direction: Service -> Storage. 
+    // Direction: Service -> Storage.
     // Visually: Container ----> Volume.
 
     Object.entries(services).forEach(([name, svc]) => {
@@ -534,7 +527,7 @@ export const generateMultiProjectGraphviz = (projects, conflicts = []) => {
     });
 
     // Shared networks
-    const sharedNumbers = [...allNetworks.entries()].filter(([_, projs]) => projs.length > 1);
+    const sharedNumbers = [...allNetworks.entries()].filter(([, projs]) => projs.length > 1);
     if (sharedNumbers.length > 0) {
         dot += `  subgraph cluster_shared {\n`;
         dot += `    label="SHARED NETWORKS"\n`;

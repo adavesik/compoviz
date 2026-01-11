@@ -9,9 +9,6 @@ export const IssuesPanel = ({ errors, onSelect }) => {
 
     if (errors.length === 0) return null;
 
-    const errorCount = errors.filter(e => e.type === 'error').length;
-    const warningCount = errors.filter(e => e.type === 'warning').length;
-
     return (
         <div className="p-3 border-t border-cyber-border/50">
             <button

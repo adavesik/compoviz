@@ -1,6 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
-import { composeReducer, initialState } from './useCompose';
-import { useHistoryReducer } from './useHistory';
+import { useState, useCallback } from 'react';
 import { parseYaml } from '../utils/yaml';
 
 /**

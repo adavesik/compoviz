@@ -1,3 +1,4 @@
+import React from 'react';
 /**
  * Icon button component with variants
  * @param {React.ComponentType} icon - Lucide icon component

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { X, Server, Network, Database, Key, FileText, Trash2, Box } from 'lucide-react';
 
 // Import config components
@@ -26,9 +26,6 @@ const NodeConfigPanel = memo(({
     const [isRenaming, setIsRenaming] = useState(false);
     const [newName, setNewName] = useState(nodeName);
 
-    useEffect(() => {
-        setLocalData(nodeData || {});
-    }, [nodeData]);
 
     // Update local state and propagate to parent
     const update = useCallback((field, value) => {

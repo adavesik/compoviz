@@ -4,7 +4,7 @@ import { Input, Select, Checkbox, KeyValueEditor, Section } from './PanelUI';
 /**
  * Volume configuration panel
  */
-export const VolumeConfig = ({ data, update, updateNested }) => (
+export const VolumeConfig = ({ data, update }) => (
     <div className="config-sections">
         <Section title="Configuration" icon={Settings} defaultOpen={true}>
             <Select

@@ -74,9 +74,13 @@ export default function App() {
   useEffect(() => {
     const saved = localStorage.getItem('docker-compose-state');
     if (saved) {
-      try { dispatch({ type: 'SET_STATE', payload: JSON.parse(saved) }); } catch { }
+      try {
+        dispatch({ type: 'SET_STATE', payload: JSON.parse(saved) });
+      } catch {
+        // Silence loading errors
+      }
     }
-  }, []);
+  }, [dispatch]);
 
   // Save to localStorage and generate YAML
   useEffect(() => {
@@ -127,10 +131,8 @@ export default function App() {
   }, [selected, dispatch]);
 
   const handleYamlChange = (newYaml) => {
-    try {
-      const parsed = parseYaml(newYaml);
-      dispatch({ type: 'SET_STATE', payload: parsed });
-    } catch (e) { throw e; }
+    const parsed = parseYaml(newYaml);
+    dispatch({ type: 'SET_STATE', payload: parsed });
   };
 
   const handleExport = () => {

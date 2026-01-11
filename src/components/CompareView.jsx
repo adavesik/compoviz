@@ -1,109 +1,20 @@
-import { useState, useRef, useEffect, memo } from 'react';
-import { Upload, AlertCircle, Trash2, ZoomIn, ZoomOut, RotateCcw, AlertTriangle, Info, XCircle } from 'lucide-react';
+import { useState, useRef, useEffect, memo, useMemo } from 'react';
+import { Upload, AlertCircle, Trash2, ZoomIn, ZoomOut, RotateCcw, AlertTriangle, Info, XCircle, Plus } from 'lucide-react';
 import { useMultiProject } from '../hooks/useMultiProject';
 import { compareProjects, getComparisonSummary } from '../utils/comparison';
-import { generateMultiProjectGraphviz } from '../utils/graphviz';
 import { renderDot, resetGraphviz } from '../utils/graphvizRenderer';
+import { generateMultiProjectGraphviz } from '../utils/graphviz';
 
-// Conflict Panel Component
-const ConflictPanel = ({ results }) => {
-    const summary = getComparisonSummary(results);
-    const [expandedIdx, setExpandedIdx] = useState(null);
-
-    const severityIcon = {
-        error: <XCircle size={14} className="text-cyber-error" />,
-        warning: <AlertTriangle size={14} className="text-cyber-warning" />,
-        info: <Info size={14} className="text-cyber-accent" />,
-    };
-
-    const severityBg = {
-        error: 'bg-cyber-error/10 border-cyber-error/30',
-        warning: 'bg-cyber-warning/10 border-cyber-warning/30',
-        info: 'bg-cyber-accent/10 border-cyber-accent/30',
-    };
-
-    if (results.length === 0) {
-        return (
-            <div className="p-4 text-center text-cyber-text-muted">
-                <Info size={24} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No conflicts or shared resources detected</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="p-3 space-y-3">
-            {/* Summary */}
-            <div className="flex gap-3 text-xs">
-                {summary.errors > 0 && (
-                    <span className="flex items-center gap-1 text-cyber-error">
-                        <XCircle size={12} /> {summary.errors} error{summary.errors !== 1 && 's'}
-                    </span>
-                )}
-                {summary.warnings > 0 && (
-                    <span className="flex items-center gap-1 text-cyber-warning">
-                        <AlertTriangle size={12} /> {summary.warnings} warning{summary.warnings !== 1 && 's'}
-                    </span>
-                )}
-                {summary.info > 0 && (
-                    <span className="flex items-center gap-1 text-cyber-accent">
-                        <Info size={12} /> {summary.info} shared
-                    </span>
-                )}
-            </div>
-
-            {/* Results list */}
-            {results.map((result, idx) => (
-                <div
-                    key={idx}
-                    className={`p-2 rounded-lg border cursor-pointer transition-all hover:brightness-110 ${severityBg[result.severity]}`}
-                    onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
-                >
-                    <div className="flex items-start gap-2">
-                        {severityIcon[result.severity]}
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">{result.message}</p>
-                            <p className="text-xs text-cyber-text-muted mt-1">
-                                Projects: {result.projects.join(', ')}
-                                <span className="ml-2 text-cyber-accent">
-                                    {expandedIdx === idx ? '▲ collapse' : '▼ details'}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-                    {/* Expanded details */}
-                    {expandedIdx === idx && result.details && Array.isArray(result.details) && (
-                        <div className="mt-3 pt-2 border-t border-white/10 space-y-1.5 animate-fade-in">
-                            <p className="text-xs text-cyber-text-muted font-medium mb-2">Affected services:</p>
-                            {result.details.map((detail, i) => (
-                                <div key={i} className="flex items-center gap-2 text-xs bg-black/20 rounded px-2 py-1">
-                                    <span className="font-medium text-cyber-text">{detail.project}</span>
-                                    <span className="text-cyber-text-muted">→</span>
-                                    <span className="text-cyber-accent font-medium">{detail.service}</span>
-                                    {detail.mapping && (
-                                        <code className="ml-auto bg-cyber-surface px-1.5 py-0.5 rounded text-cyber-warning font-mono">
-                                            {detail.mapping}
-                                        </code>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            ))}
-        </div>
-    );
-};
-
-// Multi-Project Diagram with Graphviz rendering
-const MultiProjectDiagram = memo(({ projects, conflicts }) => {
+/**
+ * Diagram view for multi-project comparison
+ */
+const DiagramView = memo(({ projects, conflicts }) => {
     const containerRef = useRef(null);
     const [scale, setScale] = useState(0.8);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [dragging, setDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [error, setError] = useState(null);
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
@@ -111,7 +22,6 @@ const MultiProjectDiagram = memo(({ projects, conflicts }) => {
             if (!containerRef.current) return;
             try {
                 setError(null);
-                setLoading(true);
                 const dot = generateMultiProjectGraphviz(projects, conflicts);
                 const svg = await renderDot(dot);
                 if (cancelled || !containerRef.current) return;
@@ -125,11 +35,9 @@ const MultiProjectDiagram = memo(({ projects, conflicts }) => {
                     svgElement.style.maxWidth = 'none';
                     svgElement.style.maxHeight = 'none';
                 }
-                if (!cancelled) setLoading(false);
             } catch (e) {
                 if (cancelled) return;
                 setError(e.message);
-                setLoading(false);
             }
         };
         render();
@@ -151,76 +59,50 @@ const MultiProjectDiagram = memo(({ projects, conflicts }) => {
 
     if (error) {
         return (
-            <div className="flex items-center justify-center h-full text-cyber-error">
-                <AlertCircle className="mr-2" />Diagram Error: {error}
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-cyber-error">
+                <AlertCircle size={48} className="mb-4" />
+                <h3 className="text-xl font-bold mb-2">Diagram Rendering Failed</h3>
+                <p className="max-w-md">{error}</p>
             </div>
         );
     }
 
     return (
-        <div className="relative h-full">
-            {/* Controls */}
-            <div className="absolute top-2 right-2 z-10 flex gap-1 glass rounded-lg p-1">
-                <button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-cyber-surface-light rounded" title="Zoom In">
-                    <ZoomIn size={18} />
-                </button>
-                <button onClick={() => setScale(s => Math.max(s - 0.1, 0.3))} className="p-2 hover:bg-cyber-surface-light rounded" title="Zoom Out">
-                    <ZoomOut size={18} />
-                </button>
-                <button onClick={resetView} className="p-2 hover:bg-cyber-surface-light rounded" title="Reset View">
-                    <RotateCcw size={18} />
-                </button>
-            </div>
-
-            {/* Legend */}
-            <div className="absolute bottom-4 left-4 z-10 glass rounded-xl p-4 space-y-2">
-                <div className="text-xs font-semibold text-cyber-text-muted uppercase tracking-wide mb-2">Legend</div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-[#1e3a8a] border-2 border-[#3b82f6]"></div>
-                    <span className="text-xs">Project A</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-[#065f46] border-2 border-[#10b981]"></div>
-                    <span className="text-xs">Project B</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-[#164e63] border-2 border-[#06b6d4]"></div>
-                    <span className="text-xs">Project C</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-[#991b1b] border-2 border-[#ef4444]"></div>
-                    <span className="text-xs">Conflict</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-[#4c1d95] border-2 border-[#a78bfa] border-dashed"></div>
-                    <span className="text-xs">Shared</span>
-                </div>
-            </div>
-
-            {/* Diagram */}
+        <div
+            className="w-full h-full relative cursor-grab overflow-hidden"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+        >
             <div
-                className="h-full overflow-hidden cursor-grab active:cursor-grabbing"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-            >
-                <div
-                    ref={containerRef}
-                    style={{
-                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                        transformOrigin: 'center center',
-                        transition: dragging ? 'none' : 'transform 0.2s'
-                    }}
-                    className="w-full h-full flex items-center justify-center"
-                />
+                ref={containerRef}
+                className="w-full h-full flex items-center justify-center transition-transform duration-75"
+                style={{
+                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                    pointerEvents: dragging ? 'none' : 'auto'
+                }}
+            />
+
+            {/* View Controls */}
+            <div className="absolute bottom-6 right-6 flex flex-col gap-2">
+                <button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Zoom In"><ZoomIn size={20} /></button>
+                <button onClick={() => setScale(s => Math.max(s - 0.1, 0.2))} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Zoom Out"><ZoomOut size={20} /></button>
+                <button onClick={resetView} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Reset View"><RotateCcw size={20} /></button>
+            </div>
+
+            {/* Hint */}
+            <div className="absolute bottom-6 left-6 p-4 glass rounded-xl border border-cyber-border/50 text-xs text-cyber-text-muted select-none pointer-events-none shadow-lg">
+                💡 Drag to pan, scroll or use buttons to zoom
             </div>
         </div>
     );
 });
 
+DiagramView.displayName = 'DiagramView';
+
 // Main Compare View Component
-export default function CompareView() {
+function CompareView() {
     const {
         projects,
         addProject,
@@ -229,8 +111,15 @@ export default function CompareView() {
     } = useMultiProject();
 
     const fileInputRef = useRef(null);
-    const [comparisonResults, setComparisonResults] = useState([]);
     const [isDragging, setIsDragging] = useState(false);
+
+    // Run comparison whenever projects change
+    const comparisonResults = useMemo(() => {
+        if (projects.length >= 2) {
+            return compareProjects(projects);
+        }
+        return [];
+    }, [projects]);
 
     const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
     const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
@@ -262,16 +151,6 @@ export default function CompareView() {
         });
     };
 
-    // Run comparison whenever projects change
-    useEffect(() => {
-        if (projects.length >= 2) {
-            const results = compareProjects(projects);
-            setComparisonResults(results);
-        } else {
-            setComparisonResults([]);
-        }
-    }, [projects]);
-
     const handleFileSelect = (e) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -279,126 +158,158 @@ export default function CompareView() {
             reader.onload = (event) => {
                 const result = addProject(event.target?.result, file.name);
                 if (!result.success) {
-                    alert('Failed to parse YAML: ' + result.error);
+                    alert(`Failed to parse ${file.name}: ${result.error}`);
                 }
             };
             reader.readAsText(file);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
-        // Reset input
-        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
+    const conflicts = comparisonResults.filter(r => r.type === 'error');
+    const summary = getComparisonSummary(comparisonResults);
+
     return (
-        <div className="h-full w-full flex flex-col">
-            {/* Header */}
-            <div className="p-4 border-b border-cyber-border/50 glass">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 className="text-lg font-bold">Multi-Project Comparison</h2>
-                        <p className="text-sm text-cyber-text-muted">Load up to 3 docker-compose files to compare</p>
+        <div className="h-full flex flex-col overflow-hidden">
+            {/* Project Management Header */}
+            <div className="p-4 bg-cyber-surface border-b border-cyber-border/50 shadow-lg z-10">
+                <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            {projects.map(p => (
+                                <div key={p.id} className="group relative flex items-center gap-2 px-3 py-1.5 glass rounded-lg border border-cyber-accent/30 hover:border-cyber-accent transition-all">
+                                    <span className="text-sm font-medium truncate max-w-[120px]">{p.name}</span>
+                                    <button
+                                        onClick={() => removeProject(p.id)}
+                                        className="text-cyber-text-muted hover:text-cyber-error transition-colors"
+                                    >
+                                        <XCircle size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                            {projects.length < 3 && (
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="p-1.5 rounded-lg border border-dashed border-cyber-accent/30 text-cyber-accent hover:bg-cyber-accent/10 transition-all flex items-center gap-2"
+                                    title="Add Project"
+                                >
+                                    <Plus size={16} />
+                                    <span className="text-xs font-semibold uppercase tracking-wider pr-1">Add Project</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={projects.length >= 3}
-                            className="btn btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Upload size={16} />
-                            Load Project ({projects.length}/3)
-                        </button>
+
+                    <div className="flex items-center gap-3">
                         {projects.length > 0 && (
-                            <button onClick={clearAllProjects} className="btn btn-secondary">
+                            <button
+                                onClick={clearAllProjects}
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-cyber-text-muted hover:text-cyber-error hover:bg-cyber-error/10 transition-all"
+                            >
+                                <Trash2 size={16} />
                                 Clear All
                             </button>
                         )}
                         <input
-                            ref={fileInputRef}
                             type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
                             accept=".yml,.yaml"
                             className="hidden"
-                            onChange={handleFileSelect}
                         />
                     </div>
                 </div>
-
-                {/* Project Pills */}
-                {projects.length > 0 && (
-                    <div className="flex gap-2 flex-wrap">
-                        {projects.map((project, idx) => (
-                            <div
-                                key={project.id}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${idx === 0 ? 'bg-blue-500/10 border-blue-500/30' :
-                                    idx === 1 ? 'bg-green-500/10 border-green-500/30' :
-                                        'bg-cyan-500/10 border-cyan-500/30'
-                                    }`}
-                            >
-                                <span className="text-lg">{['🔵', '🟢', '🩵'][idx]}</span>
-                                <span className="text-sm font-medium">{project.name}</span>
-                                <span className="text-xs text-cyber-text-muted">
-                                    ({Object.keys(project.content?.services || {}).length} services)
-                                </span>
-                                <button
-                                    onClick={() => removeProject(project.id)}
-                                    className="p-1 hover:bg-cyber-surface-light rounded"
-                                >
-                                    <Trash2 size={14} className="text-cyber-text-muted hover:text-cyber-error" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden">
-                {projects.length === 0 ? (
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden relative">
+                {projects.length < 2 ? (
                     <div
-                        className={`flex-1 flex flex-col items-center justify-center text-cyber-text-muted transition-all duration-300 m-4 border-2 border-dashed rounded-xl ${isDragging ? 'border-cyber-accent bg-cyber-accent/5' : 'border-transparent'}`}
+                        className={`h-full flex flex-col items-center justify-center p-8 transition-all ${isDragging ? 'bg-cyber-accent/5' : ''
+                            }`}
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
                     >
-                        <div className={`text-center transition-all duration-300 ${isDragging ? 'scale-110' : ''}`}>
-                            <Upload size={48} className={`mx-auto mb-4 ${isDragging ? 'text-cyber-accent animate-bounce' : 'opacity-50'}`} />
-                            <p className="text-lg mb-2 font-medium">Load docker-compose files to compare</p>
-                            <p className="text-sm">Upload at least 2 files to see conflicts and shared resources</p>
-                            <p className="text-xs mt-4 text-cyber-text-muted">Drag & drop up to 3 files here</p>
-                        </div>
-                    </div>
-                ) : projects.length === 1 ? (
-                    <div
-                        className={`flex-1 flex flex-col items-center justify-center text-cyber-text-muted transition-all duration-300 m-4 border-2 border-dashed rounded-xl ${isDragging ? 'border-cyber-accent bg-cyber-accent/5' : 'border-transparent'}`}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                    >
-                        <div className={`text-center transition-all duration-300 ${isDragging ? 'scale-110' : ''}`}>
-                            <AlertCircle size={48} className={`mx-auto mb-4 ${isDragging ? 'text-cyber-accent animate-bounce' : 'opacity-50'}`} />
-                            <p className="text-lg mb-2 font-medium">Load one more project</p>
-                            <p className="text-sm">Need at least 2 projects to compare</p>
-                            <p className="text-xs mt-4 text-cyber-text-muted">Drag & drop another file here</p>
+                        <div className="max-w-md w-full text-center space-y-6">
+                            <div className="relative group mx-auto w-24 h-24 mb-6">
+                                <div className="absolute inset-0 bg-cyber-accent/20 rounded-full blur-2xl group-hover:bg-cyber-accent/40 transition-all animate-pulse" />
+                                <div className="relative flex items-center justify-center w-full h-full glass rounded-full border border-cyber-accent/30 group-hover:border-cyber-accent transition-all">
+                                    <Upload size={40} className="text-cyber-accent" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <h1 className="text-3xl font-bold mb-3 tracking-tight">Compare Projects</h1>
+                                <p className="text-cyber-text-muted text-lg">
+                                    {projects.length === 0
+                                        ? "Drop up to 3 Docker Compose files here to analyze conflicts and dependencies across projects."
+                                        : "Drop another compose file to start the comparison analysis."
+                                    }
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="px-8 py-4 bg-cyber-accent text-white rounded-2xl font-bold hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-cyber-accent/20"
+                            >
+                                Choose Files
+                            </button>
+
+                            <div className="grid grid-cols-2 gap-4 text-left">
+                                <div className="p-4 glass rounded-2xl border border-cyber-border/50">
+                                    <AlertTriangle className="text-cyber-warning mb-2" size={20} />
+                                    <h3 className="font-semibold text-sm">Conflict Detection</h3>
+                                    <p className="text-xs text-cyber-text-muted mt-1">Identifies overlapping ports, networks, and service names.</p>
+                                </div>
+                                <div className="p-4 glass rounded-2xl border border-cyber-border/50">
+                                    <Info className="text-cyber-accent mb-2" size={20} />
+                                    <h3 className="font-semibold text-sm">Visual Mapping</h3>
+                                    <p className="text-xs text-cyber-text-muted mt-1">Generates a unified diagram of all interacting components.</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 ) : (
                     <>
-                        {/* Diagram */}
-                        <div className="flex-1 p-4">
-                            <div className="h-full glass rounded-xl overflow-hidden">
-                                <MultiProjectDiagram projects={projects} conflicts={comparisonResults} />
+                        {/* Comparison Summary Overlay */}
+                        <div className="absolute top-6 left-6 z-20 w-80 space-y-4">
+                            <div className="glass p-5 rounded-2xl border border-cyber-border/50 shadow-2xl animate-slide-in">
+                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                    Analysis Results
+                                    {conflicts.length > 0 ? (
+                                        <Badge index={0} type="error">{conflicts.length} Conflicts</Badge>
+                                    ) : (
+                                        <Badge index={1} type="success">No Conflicts</Badge>
+                                    )}
+                                </h3>
+
+                                <div className="space-y-4">
+                                    <p className="text-sm text-cyber-text-muted leading-relaxed">{summary}</p>
+
+                                    {comparisonResults.length > 0 && (
+                                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                                            {comparisonResults.map((res, idx) => (
+                                                <div key={idx} className={`p-3 rounded-xl border text-xs flex gap-3 ${res.type === 'error'
+                                                    ? 'bg-cyber-error/10 border-cyber-error/30 text-cyber-error'
+                                                    : 'bg-cyber-warning/10 border-cyber-warning/30 text-cyber-warning'
+                                                    }`}>
+                                                    <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                                                    <div className="space-y-1">
+                                                        <p className="font-bold uppercase tracking-wider text-[10px] opacity-70">{res.category}</p>
+                                                        <p className="font-medium leading-normal">{res.message}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
-                        {/* Conflicts Panel */}
-                        <div className="w-80 border-l border-cyber-border/50 glass-light flex flex-col">
-                            <div className="p-3 border-b border-cyber-border/50">
-                                <h3 className="font-semibold flex items-center gap-2">
-                                    <AlertCircle size={16} className="text-cyber-warning" />
-                                    Analysis Results
-                                </h3>
-                            </div>
-                            <div className="flex-1 overflow-auto">
-                                <ConflictPanel results={comparisonResults} />
-                            </div>
+                        {/* Unified Diagram View */}
+                        <div className="w-full h-full bg-[#0b0f1a]">
+                            <DiagramView projects={projects} conflicts={conflicts} />
                         </div>
                     </>
                 )}
@@ -406,3 +317,16 @@ export default function CompareView() {
         </div>
     );
 }
+
+// Helper badge component for summary
+const Badge = memo(({ children, type }) => (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${type === 'error' ? 'bg-cyber-error text-white' : 'bg-cyber-success text-white'
+        }`}>
+        {children}
+    </span>
+));
+
+Badge.displayName = 'Badge';
+CompareView.displayName = 'CompareView';
+
+export default CompareView;

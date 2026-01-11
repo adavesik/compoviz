@@ -1,4 +1,4 @@
-                      import { memo } from 'react';
+import React, { memo } from 'react';
 import { Server, Network, Database, Key, FileText } from 'lucide-react';
 
 /**

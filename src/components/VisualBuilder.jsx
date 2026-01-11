@@ -22,17 +22,15 @@ import { Download } from 'lucide-react';
  * Allows drag-and-drop creation and connection of Docker resources.
  * Now includes NodeConfigPanel for full configuration of each node.
  */
-export default function VisualBuilder({ state, dispatch, onSelectNode, errors = [] }) {
+export default function VisualBuilder({ state, dispatch }) {
     const reactFlowWrapper = useRef(null);
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const [selectedNode, setSelectedNode] = useState(null);
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
     // Handle window resize for mobile detection
     useEffect(() => {
         const handleResize = () => {
             const mobile = window.innerWidth < 768;
-            setIsMobile(mobile);
             // Auto-close config panel when switching to mobile
             if (mobile && selectedNode) {
                 // Keep panel open but it will be full-screen via CSS
@@ -427,6 +425,7 @@ export default function VisualBuilder({ state, dispatch, onSelectNode, errors = 
             {/* Config Panel - slides in from right when a node is selected */}
             {selectedNode && (
                 <NodeConfigPanel
+                    key={`${selectedNode.type}-${selectedNode.name}`}
                     nodeType={selectedNode.type}
                     nodeName={selectedNode.name}
                     nodeData={getSelectedNodeData()}

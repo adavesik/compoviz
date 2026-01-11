@@ -15,7 +15,6 @@ export const ServiceConfig = ({
     updateNested,
     allNetworks,
     allServices,
-    allVolumes,
     allSecrets,
     allConfigs,
     nodeName
