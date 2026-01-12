@@ -3,7 +3,6 @@ import { ZoomIn, ZoomOut, RotateCcw, AlertCircle, Download, Maximize } from 'luc
 import { IconButton } from '../../components/ui';
 import ContextMenu from './ContextMenu';
 import { renderDot, resetGraphviz } from '../../utils/graphvizRenderer';
-import { sanitizeSvg } from '../../utils/graphviz';
 
 /**
  * Graphviz diagram with pan/zoom and right-click context menu
@@ -27,12 +26,10 @@ export const GraphvizDiagram = memo(({ dot, onNodeClick, onAdd }) => {
             try {
                 setError(null);
                 setLoading(true);
-                const svgString = await renderDot(dot);
+                const svg = await renderDot(dot);
                 if (cancelled || !containerRef.current) return;
-
-                const svgElement = sanitizeSvg(svgString);
-                containerRef.current.replaceChildren(svgElement);
-                svgRef.current = svgElement;
+                containerRef.current.innerHTML = svg;
+                svgRef.current = containerRef.current.querySelector('svg');
 
                 // Style the SVG
                 if (svgRef.current) {

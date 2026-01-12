@@ -11,7 +11,6 @@ const escapeLabel = (str) => {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/\\/g, '\\\\')
         .replace(/\n/g, ' ');
 };
 
@@ -90,29 +89,6 @@ const classifyServiceTier = (name, svc) => {
     }
 
     return 'application';
-};
-
-/**
- * Securely sanitizes SVG content for DOM insertion.
- * @param {string} svgString - The raw SVG string.
- * @returns {SVGElement} The sanitized SVG element.
- */
-export const sanitizeSvg = (svgString) => {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgString, 'image/svg+xml');
-    const parserError = doc.querySelector('parsererror');
-    if (parserError) throw new Error('Failed to parse SVG');
-
-    // Basic sanitization
-    doc.querySelectorAll('script').forEach(el => el.remove());
-    doc.querySelectorAll('*').forEach(el => {
-        [...el.attributes].forEach(attr => {
-            if (attr.name.startsWith('on')) el.removeAttribute(attr.name);
-            if (attr.name.toLowerCase() === 'href' && attr.value.startsWith('javascript:')) el.removeAttribute(attr.name);
-        });
-    });
-
-    return doc.documentElement;
 };
 
 export const generateGraphviz = (state) => {
