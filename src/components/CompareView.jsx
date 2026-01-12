@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, memo, useMemo } from 'react';
+import { useState, useRef, useEffect, memo, useMemo, useCallback } from 'react';
 import { Upload, AlertCircle, Trash2, ZoomIn, ZoomOut, RotateCcw, AlertTriangle, Info, XCircle, Plus } from 'lucide-react';
 import { useMultiProject } from '../hooks/useMultiProject';
 import { compareProjects, getComparisonSummary } from '../utils/comparison';
@@ -10,12 +10,25 @@ import { sanitizeSvg } from '../utils/sanitizeSvg';
  * Diagram view for multi-project comparison
  */
 const DiagramView = memo(({ projects, conflicts }) => {
+    const viewportRef = useRef(null);
     const containerRef = useRef(null);
     const [scale, setScale] = useState(0.8);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [dragging, setDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [error, setError] = useState(null);
+    const scaleRef = useRef(scale);
+    const positionRef = useRef(position);
+    const diagramSizeRef = useRef({ width: 0, height: 0 });
+
+    // Lock page scrolling while the compare diagram is active
+    useEffect(() => {
+        const original = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = original;
+        };
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -39,6 +52,9 @@ const DiagramView = memo(({ projects, conflicts }) => {
                     svgElement.style.height = '100%';
                     svgElement.style.maxWidth = 'none';
                     svgElement.style.maxHeight = 'none';
+
+                    const bbox = svgElement.getBBox();
+                    diagramSizeRef.current = { width: bbox.width, height: bbox.height };
                 }
             } catch (e) {
                 if (cancelled) return;
@@ -57,10 +73,97 @@ const DiagramView = memo(({ projects, conflicts }) => {
         };
     }, []);
 
-    const handleMouseDown = (e) => { setDragging(true); setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y }); };
-    const handleMouseMove = (e) => { if (dragging) setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y }); };
+    const clampPosition = useCallback((nextPosition, nextScale) => {
+        const viewport = viewportRef.current;
+        if (!viewport) return nextPosition;
+
+        const { width, height } = diagramSizeRef.current;
+        const effectiveWidth = width || viewport.clientWidth;
+        const effectiveHeight = height || viewport.clientHeight;
+
+        const scaledWidth = effectiveWidth * nextScale;
+        const scaledHeight = effectiveHeight * nextScale;
+
+        const maxOffsetX = Math.max(0, (scaledWidth - viewport.clientWidth) / 2);
+        const maxOffsetY = Math.max(0, (scaledHeight - viewport.clientHeight) / 2);
+
+        return {
+            x: Math.min(Math.max(nextPosition.x, -maxOffsetX), maxOffsetX),
+            y: Math.min(Math.max(nextPosition.y, -maxOffsetY), maxOffsetY),
+        };
+    }, []);
+
+    const handleMouseDown = (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        setDragging(true);
+        setDragStart({
+            x: e.clientX - positionRef.current.x,
+            y: e.clientY - positionRef.current.y,
+        });
+    };
+    const handleMouseMove = (e) => {
+        if (!dragging) return;
+        const nextPosition = { x: e.clientX - dragStart.x, y: e.clientY - dragStart.y };
+        setPosition(clampPosition(nextPosition, scaleRef.current));
+    };
     const handleMouseUp = () => setDragging(false);
+    const updateScale = useCallback((getNextScale) => {
+        setScale((currentScale) => {
+            const nextScale = getNextScale(currentScale);
+            setPosition((currentPosition) => clampPosition(currentPosition, nextScale));
+            return nextScale;
+        });
+    }, [clampPosition]);
+
     const resetView = () => { setScale(0.8); setPosition({ x: 0, y: 0 }); };
+
+    useEffect(() => {
+        scaleRef.current = scale;
+        positionRef.current = position;
+    }, [scale, position]);
+
+    const handleWheel = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const currentScale = scaleRef.current;
+        const currentPosition = positionRef.current;
+        const delta = -e.deltaY;
+        const zoomIntensity = 0.002;
+        const nextScale = Math.min(Math.max(currentScale + delta * zoomIntensity, 0.2), 3);
+        if (nextScale === currentScale) return;
+
+        const viewport = viewportRef.current;
+        if (!viewport) {
+            setScale(nextScale);
+            return;
+        }
+
+        const rect = viewport.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const pointX = (mouseX - currentPosition.x) / currentScale;
+        const pointY = (mouseY - currentPosition.y) / currentScale;
+
+        const nextPosition = {
+            x: mouseX - pointX * nextScale,
+            y: mouseY - pointY * nextScale,
+        };
+
+        setScale(nextScale);
+        setPosition(clampPosition(nextPosition, nextScale));
+    }, [clampPosition]);
+
+    // Attach wheel listener with passive: false to ensure preventDefault works
+    useEffect(() => {
+        const element = viewportRef.current;
+        if (!element) return;
+
+        element.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+        return () => element.removeEventListener('wheel', handleWheel, { capture: true });
+    }, [handleWheel]);
 
     if (error) {
         return (
@@ -73,32 +176,38 @@ const DiagramView = memo(({ projects, conflicts }) => {
     }
 
     return (
-        <div
-            className="w-full h-full relative cursor-grab overflow-hidden"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-        >
-            <div
-                ref={containerRef}
-                className="w-full h-full flex items-center justify-center transition-transform duration-75"
-                style={{
-                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                    pointerEvents: dragging ? 'none' : 'auto'
-                }}
-            />
-
+        <div ref={viewportRef} className="relative h-full">
             {/* View Controls */}
-            <div className="absolute bottom-6 right-6 flex flex-col gap-2">
-                <button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Zoom In"><ZoomIn size={20} /></button>
-                <button onClick={() => setScale(s => Math.max(s - 0.1, 0.2))} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Zoom Out"><ZoomOut size={20} /></button>
+            <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2">
+                <button onClick={() => updateScale(s => Math.min(s + 0.1, 2))} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Zoom In"><ZoomIn size={20} /></button>
+                <button onClick={() => updateScale(s => Math.max(s - 0.1, 0.2))} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Zoom Out"><ZoomOut size={20} /></button>
                 <button onClick={resetView} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Reset View"><RotateCcw size={20} /></button>
             </div>
 
             {/* Hint */}
-            <div className="absolute bottom-6 left-6 p-4 glass rounded-xl border border-cyber-border/50 text-xs text-cyber-text-muted select-none pointer-events-none shadow-lg">
-                💡 Drag to pan, scroll or use buttons to zoom
+            <div className="absolute bottom-6 left-6 z-10 p-4 glass rounded-xl border border-cyber-border/50 text-xs text-cyber-text-muted select-none pointer-events-none shadow-lg">
+                💡 Drag to pan • Scroll wheel to zoom • Use buttons for precise control
+            </div>
+
+            <div
+                className="mermaid-container"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
+            >
+                <div
+                    ref={containerRef}
+                    className="w-full h-full flex items-center justify-center"
+                    style={{
+                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                        transformOrigin: 'center center',
+                        transition: dragging ? 'none' : 'transform 0.2s',
+                        pointerEvents: dragging ? 'none' : 'auto',
+                        willChange: 'transform',
+                    }}
+                />
             </div>
         </div>
     );
@@ -171,7 +280,7 @@ function CompareView() {
         }
     };
 
-    const conflicts = comparisonResults.filter(r => r.type === 'error');
+    const conflicts = comparisonResults.filter(r => r.severity === 'error');
     const summary = getComparisonSummary(comparisonResults);
     const summaryText = useMemo(() => {
         const parts = [];
@@ -287,9 +396,9 @@ function CompareView() {
                 ) : (
                     <>
                         {/* Comparison Summary Overlay */}
-                        <div className="absolute top-6 left-6 z-20 w-80 space-y-4">
-                            <div className="glass p-5 rounded-2xl border border-cyber-border/50 shadow-2xl animate-slide-in">
-                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <div className="absolute top-6 left-6 bottom-20 z-20 w-80 flex flex-col max-h-[calc(100%-8rem)]">
+                            <div className="glass p-5 rounded-2xl border border-cyber-border/50 shadow-2xl animate-slide-in flex flex-col overflow-hidden max-h-full">
+                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2 flex-shrink-0">
                                     Analysis Results
                                     {conflicts.length > 0 ? (
                                         <Badge index={0} type="error">{conflicts.length} Conflicts</Badge>
@@ -298,17 +407,19 @@ function CompareView() {
                                     )}
                                 </h3>
 
-                                <div className="space-y-4">
+                                <div className="flex-1 min-h-0 flex flex-col space-y-4">
                                     <p className="text-sm text-cyber-text-muted leading-relaxed">{summaryText}</p>
 
                                     {comparisonResults.length > 0 && (
-                                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                                        <div className="space-y-2 overflow-y-auto pr-2 flex-1 min-h-0">
                                             {comparisonResults.map((res, idx) => (
-                                                <div key={idx} className={`p-3 rounded-xl border text-xs flex gap-3 ${res.type === 'error'
-                                                    ? 'bg-cyber-error/10 border-cyber-error/30 text-cyber-error'
-                                                    : 'bg-cyber-warning/10 border-cyber-warning/30 text-cyber-warning'
+                                                <div key={idx} className={`p-3 rounded-xl border text-xs flex gap-3 ${res.severity === 'error' ? 'bg-cyber-error/10 border-cyber-error/30 text-cyber-error' :
+                                                    res.severity === 'warning' ? 'bg-cyber-warning/10 border-cyber-warning/30 text-cyber-warning' :
+                                                        'bg-cyber-accent/10 border-cyber-accent/30 text-cyber-accent'
                                                     }`}>
-                                                    <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                                                    {res.severity === 'error' ? <XCircle size={14} className="shrink-0 mt-0.5" /> :
+                                                        res.severity === 'warning' ? <AlertTriangle size={14} className="shrink-0 mt-0.5" /> :
+                                                            <Info size={14} className="shrink-0 mt-0.5" />}
                                                     <div className="space-y-1">
                                                         <p className="font-bold uppercase tracking-wider text-[10px] opacity-70">{res.category}</p>
                                                         <p className="font-medium leading-normal">{res.message}</p>
