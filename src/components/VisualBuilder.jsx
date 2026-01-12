@@ -52,18 +52,8 @@ export default function VisualBuilder({ state, dispatch }) {
     // Sync nodes when state changes externally
     React.useEffect(() => {
         const { nodes: newNodes, edges: newEdges } = stateToFlow(state);
-
-        // Optimization: Only update nodes if they have structurally changed.
-        // We compare critical fields and ignore internal React Flow props (width, height, selected, dragging).
-        setNodes((prevNodes) => {
-            if (shouldUpdateNodes(prevNodes, newNodes)) return newNodes;
-            return prevNodes;
-        });
-
-        setEdges((prevEdges) => {
-            if (shouldUpdateEdges(prevEdges, newEdges)) return newEdges;
-            return prevEdges;
-        });
+        setNodes(newNodes);
+        setEdges(newEdges);
     }, [state, setNodes, setEdges]);
 
     // Handle new edge connections
@@ -452,61 +442,4 @@ export default function VisualBuilder({ state, dispatch }) {
             )}
         </div>
     );
-}
-
-// Helper to determine if nodes should be updated
-function shouldUpdateNodes(prevNodes, newNodes) {
-    if (prevNodes.length !== newNodes.length) return true;
-
-    for (let i = 0; i < newNodes.length; i++) {
-        const newNode = newNodes[i];
-        const prevNode = prevNodes[i]; // Assuming order is stable from stateToFlow
-
-        if (!prevNode) return true;
-        if (newNode.id !== prevNode.id) return true;
-        if (newNode.type !== prevNode.type) return true;
-
-        // Position
-        if (newNode.position.x !== prevNode.position.x || newNode.position.y !== prevNode.position.y) return true;
-
-        // Visual props
-        if (newNode.className !== prevNode.className) return true;
-        if (newNode.style !== prevNode.style) return true; // Note: this is reference comparison, deep check if style is object? stateToFlow doesn't set style usually
-        if (newNode.hidden !== prevNode.hidden) return true;
-        if (newNode.draggable !== prevNode.draggable) return true;
-        if (newNode.connectable !== prevNode.connectable) return true;
-        if (newNode.zIndex !== prevNode.zIndex) return true;
-
-        // Data (deep comparison)
-        if (JSON.stringify(newNode.data) !== JSON.stringify(prevNode.data)) return true;
-    }
-
-    return false;
-}
-
-// Helper to determine if edges should be updated
-function shouldUpdateEdges(prevEdges, newEdges) {
-    if (prevEdges.length !== newEdges.length) return true;
-
-    for (let i = 0; i < newEdges.length; i++) {
-        const newEdge = newEdges[i];
-        const prevEdge = prevEdges[i];
-
-        if (!prevEdge) return true;
-        if (newEdge.id !== prevEdge.id) return true;
-        if (newEdge.source !== prevEdge.source) return true;
-        if (newEdge.target !== prevEdge.target) return true;
-        if (newEdge.type !== prevEdge.type) return true;
-
-        // Visual props
-        if (newEdge.label !== prevEdge.label) return true;
-        if (newEdge.animated !== prevEdge.animated) return true;
-        if (newEdge.style !== prevEdge.style) return true;
-        if (newEdge.markerEnd !== prevEdge.markerEnd) return true;
-
-        // Data (deep comparison)
-        if (JSON.stringify(newEdge.data) !== JSON.stringify(prevEdge.data)) return true;
-    }
-
-    return false;
 }
