@@ -3,7 +3,7 @@ import { Upload, AlertCircle, Trash2, ZoomIn, ZoomOut, RotateCcw, AlertTriangle,
 import { useMultiProject } from '../hooks/useMultiProject';
 import { compareProjects, getComparisonSummary } from '../utils/comparison';
 import { renderDot, resetGraphviz } from '../utils/graphvizRenderer';
-import { generateMultiProjectGraphviz } from '../utils/graphviz';
+import { generateMultiProjectGraphviz, sanitizeSvg } from '../utils/graphviz';
 
 /**
  * Diagram view for multi-project comparison
@@ -23,12 +23,13 @@ const DiagramView = memo(({ projects, conflicts }) => {
             try {
                 setError(null);
                 const dot = generateMultiProjectGraphviz(projects, conflicts);
-                const svg = await renderDot(dot);
+                const svgString = await renderDot(dot);
                 if (cancelled || !containerRef.current) return;
-                containerRef.current.innerHTML = svg;
+
+                const svgElement = sanitizeSvg(svgString);
+                containerRef.current.replaceChildren(svgElement);
 
                 // Style the SVG
-                const svgElement = containerRef.current.querySelector('svg');
                 if (svgElement) {
                     svgElement.style.width = '100%';
                     svgElement.style.height = '100%';
