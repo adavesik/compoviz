@@ -1,3 +1,5 @@
+import { extractHostPort } from './comparison';
+
 /**
  * Helper to normalize depends_on (can be array or object in Docker Compose).
  * @param {Array|object} dependsOn - The depends_on value.
@@ -71,12 +73,12 @@ export const validateState = (state) => {
 
         // Check for port conflicts
         normalizeArray(svc.ports).forEach(port => {
-            const hostPort = typeof port === 'string' ? port.split(':')[0] : null;
-            if (hostPort) {
-                if (usedPorts.has(hostPort)) {
-                    errors.push({ type: 'error', entity: 'service', name, message: `Port ${hostPort} already used by "${usedPorts.get(hostPort)}"` });
+            const hostBinding = extractHostPort(port);
+            if (hostBinding) {
+                if (usedPorts.has(hostBinding)) {
+                    errors.push({ type: 'error', entity: 'service', name, message: `Port binding ${hostBinding} already used by "${usedPorts.get(hostBinding)}"` });
                 } else {
-                    usedPorts.set(hostPort, name);
+                    usedPorts.set(hostBinding, name);
                 }
             }
         });

@@ -77,5 +77,67 @@ describe('graphviz utils', () => {
             expect(dot).toContain('label="💾 pg_data"');
             expect(dot).toMatch(/db\s*->\s*vol_pg_data/);
         });
+
+        it('correctly extracts host port from bind address format', () => {
+            const state = {
+                services: {
+                    web: {
+                        image: 'nginx',
+                        ports: [
+                            '10.22.60.110:80:80',
+                            '10.22.60.110:443:443',
+                            '127.0.0.1:8080:8080/tcp'
+                        ]
+                    }
+                }
+            };
+            const dot = generateGraphviz(state);
+            // Should extract port numbers (80, 443, 8080), not IP addresses
+            expect(dot).toContain('label="80"');
+            expect(dot).toContain('label="443"');
+            expect(dot).toContain('label="8080"');
+            // Should NOT contain IP addresses as port labels
+            expect(dot).not.toContain('label="10.22.60.110"');
+            expect(dot).not.toContain('label="127.0.0.1"');
+        });
+
+        it('correctly handles IPv6 addresses with square brackets', () => {
+            const state = {
+                services: {
+                    web: {
+                        image: 'nginx',
+                        ports: [
+                            '[::1]:8080:80',
+                            '[::1]:3000:3000/tcp',
+                            '[2001:db8::1]:443:443'
+                        ]
+                    }
+                }
+            };
+            const dot = generateGraphviz(state);
+            // Should extract port numbers from IPv6 addresses
+            expect(dot).toContain('label="8080"');
+            expect(dot).toContain('label="3000"');
+            expect(dot).toContain('label="443"');
+            // Should NOT contain IPv6 addresses as labels
+            expect(dot).not.toContain('label="[::1]"');
+            expect(dot).not.toContain('label="::1"');
+            expect(dot).not.toContain('label="2001:db8::1"');
+        });
+
+        it('correctly extracts protocol from port mappings', () => {
+            const state = {
+                services: {
+                    dns: {
+                        image: 'coredns',
+                        ports: ['53:53/udp', '6060:6060/tcp']
+                    }
+                }
+            };
+            const dot = generateGraphviz(state);
+            // Should show correct protocols
+            expect(dot).toMatch(/label="udp"/);
+            expect(dot).toMatch(/label="tcp"/);
+        });
     });
 });

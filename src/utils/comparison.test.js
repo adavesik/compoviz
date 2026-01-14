@@ -149,7 +149,38 @@ describe('compareProjects', () => {
             // Different ports, no conflict
             expect(portConflicts).toHaveLength(0);
         });
+
+        it('should handle IPv6 addresses with square brackets', () => {
+            const projects = [
+                {
+                    id: 'proj1',
+                    name: 'Project 1',
+                    content: {
+                        services: {
+                            web: { ports: ['[::1]:8080:80'] }
+                        }
+                    }
+                },
+                {
+                    id: 'proj2',
+                    name: 'Project 2',
+                    content: {
+                        services: {
+                            api: { ports: ['[::1]:8080:8080'] }
+                        }
+                    }
+                }
+            ];
+
+            const results = compareProjects(projects);
+            const portConflicts = results.filter(r => r.category === 'port');
+
+            // Same IPv6 address and same host port = conflict
+            expect(portConflicts).toHaveLength(1);
+            expect(portConflicts[0].message).toContain('[::1]:8080');
+        });
     });
+
 
     describe('container name conflicts', () => {
         it('should detect container name conflicts', () => {

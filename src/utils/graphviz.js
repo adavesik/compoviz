@@ -124,8 +124,56 @@ export const generateGraphviz = (state) => {
         normalizeArray(svc.ports).forEach((port, idx) => {
             let hostPort, protocol;
             if (typeof port === 'string') {
-                hostPort = port.split(':')[0];
-                protocol = port.split('/')[1] || 'tcp';
+                // Parse string format: supports IPv4, IPv6, and all Docker Compose formats
+                let portPart;
+
+                // Handle IPv6 with square brackets: [::1]:8080:80
+                if (port.startsWith('[')) {
+                    const closeBracket = port.indexOf(']');
+                    if (closeBracket !== -1) {
+                        const remaining = port.substring(closeBracket + 1);
+                        if (remaining.startsWith(':')) {
+                            const remainingParts = remaining.substring(1).split(':');
+                            // remainingParts = ['8080', '80'] or ['8080'] or ['80']
+                            portPart = remainingParts[0];
+                        } else {
+                            portPart = port; // Fallback
+                        }
+                    } else {
+                        portPart = port; // Invalid but fallback
+                    }
+                } else {
+                    // Handle IPv4 or simple formats
+                    const parts = port.split(':');
+
+                    if (parts.length === 2) {
+                        // Format: HOST:CONTAINER
+                        portPart = parts[0];
+                    } else if (parts.length === 3) {
+                        // Format: IP:HOST:CONTAINER (IPv4)
+                        portPart = parts[1];
+                    } else if (parts.length > 3) {
+                        // Likely IPv6 without brackets (ambiguous, skip)
+                        portPart = parts[0]; // Fallback to first part
+                    } else {
+                        // Single part: just container port
+                        portPart = parts[0];
+                    }
+                }
+
+                // Extract host port and protocol
+                // Protocol suffix is in the original port string (e.g., "6060:6060/udp")
+                const protocolSplit = portPart.split('/');
+                hostPort = protocolSplit[0];
+
+                // Try to get protocol from portPart first, then from full port string
+                if (protocolSplit[1]) {
+                    protocol = protocolSplit[1];
+                } else {
+                    // Check if protocol is in the original port string
+                    const portProtocolMatch = port.match(/\/(tcp|udp|sctp)$/i);
+                    protocol = portProtocolMatch ? portProtocolMatch[1].toLowerCase() : 'tcp';
+                }
             } else {
                 hostPort = port.published;
                 protocol = port.protocol || 'tcp';
