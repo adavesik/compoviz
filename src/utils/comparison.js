@@ -12,17 +12,38 @@ import { normalizeArray } from './validation';
  */
 
 /**
- * Extract host port from a port mapping string.
+ * Extract host binding (IP:Port) from a port mapping string.
+ * Returns the full binding specification to properly detect conflicts.
+ * Ports bound to different IPs (e.g., 127.0.0.1:80 vs 0.0.0.0:80) don't conflict.
  * @param {string} portMapping - e.g., "8080:80", "127.0.0.1:3000:3000/tcp"
- * @returns {string|null} The host port or null
+ * @returns {string|null} The host binding (IP:Port) or null
  */
 const extractHostPort = (portMapping) => {
     if (!portMapping || typeof portMapping !== 'string') return null;
     const parts = portMapping.split(':');
+
     if (parts.length >= 2) {
-        // Could be IP:HOST:CONTAINER or HOST:CONTAINER
-        const hostPart = parts.length === 3 ? parts[1] : parts[0];
-        return hostPart.split('/')[0]; // Remove protocol suffix
+        let ip, hostPort;
+
+        // Determine if there's an IP address specified
+        if (parts.length === 3) {
+            // Format: IP:HOST:CONTAINER
+            ip = parts[0];
+            hostPort = parts[1];
+        } else if (parts.length === 2) {
+            // Format: HOST:CONTAINER (no IP specified, binds to all interfaces)
+            ip = '0.0.0.0';
+            hostPort = parts[0];
+        } else {
+            // Format with 4+ parts (IPv6 or invalid), skip for now
+            return null;
+        }
+
+        // Remove protocol suffix if present (e.g., "80/tcp" → "80")
+        hostPort = hostPort.split('/')[0];
+
+        // Return full binding specification
+        return `${ip}:${hostPort}`;
     }
     return null;
 };
@@ -104,7 +125,7 @@ export function compareProjects(projects) {
     }
 
     // Detect port conflicts
-    for (const [port, usages] of portMap.entries()) {
+    for (const [binding, usages] of portMap.entries()) {
         if (usages.length > 1) {
             const projectsInvolved = [...new Set(usages.map(u => u.project))];
             if (projectsInvolved.length > 1) {
@@ -112,7 +133,7 @@ export function compareProjects(projects) {
                     type: 'conflict',
                     category: 'port',
                     severity: 'error',
-                    message: `Port ${port} is bound by multiple projects`,
+                    message: `Port binding ${binding} is used by multiple projects`,
                     projects: projectsInvolved,
                     details: usages,
                 });
