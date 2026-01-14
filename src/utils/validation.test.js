@@ -33,7 +33,7 @@ describe('validation utils', () => {
                 }
             };
             const errors = validateState(state);
-            expect(errors.some(e => e.message.includes('Port 8080 already used'))).toBe(true);
+            expect(errors.some(e => e.message.includes('Port binding 0.0.0.0:8080 already used'))).toBe(true);
         });
 
         it('detects duplicate container names', () => {
