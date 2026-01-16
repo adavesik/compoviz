@@ -16,13 +16,16 @@ import BuilderToolbar from './BuilderToolbar';
 import NodeConfigPanel from './NodeConfigPanel';
 import { stateToFlow, handleEdgeConnect, handleEdgeDelete, parseNodeId } from '../utils/flowConverter';
 import { Download } from 'lucide-react';
+import { useCompose } from '../hooks/useCompose.jsx';
 
 /**
  * Visual Builder component using React Flow for interactive compose creation.
  * Allows drag-and-drop creation and connection of Docker resources.
  * Now includes NodeConfigPanel for full configuration of each node.
  */
-export default function VisualBuilder({ state, dispatch }) {
+export default function VisualBuilder() {
+    // Get compose state from context
+    const { state, dispatch } = useCompose();
     const reactFlowWrapper = useRef(null);
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const [selectedNode, setSelectedNode] = useState(null);

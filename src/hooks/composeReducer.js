@@ -1,5 +1,3 @@
-import { useReducer, createContext, useContext } from 'react';
-
 // Initial State - Following modern Compose Specification
 // Note: `version` is obsolete, `name` is the project identifier
 export const initialState = {
@@ -53,21 +51,3 @@ export function composeReducer(state, action) {
         default: return state;
     }
 }
-
-// Context
-export const ComposeContext = createContext(null);
-
-/**
- * Hook to access the compose context.
- * @returns {{state: object, dispatch: function}} The compose state and dispatch function.
- */
-export const useCompose = () => useContext(ComposeContext);
-
-/**
- * Hook to create the compose state and dispatch.
- * @returns {{state: object, dispatch: function}} The compose state and dispatch function.
- */
-export const useComposeState = () => {
-    const [state, dispatch] = useReducer(composeReducer, initialState);
-    return { state, dispatch };
-};

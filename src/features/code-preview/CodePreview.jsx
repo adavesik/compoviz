@@ -1,11 +1,15 @@
 import { useState, useRef } from 'react';
 import { Code, Download, Upload, CheckCircle, X, Eye, Copy } from 'lucide-react';
 import { IconButton } from '../../components/ui';
+import { useCompose } from '../../hooks/useCompose.jsx';
 
 /**
  * YAML code preview with syntax highlighting and edit mode
  */
-export const CodePreview = ({ yaml: yamlCode, onYamlChange, onExport, onImport }) => {
+export const CodePreview = () => {
+    // Get compose state from context
+    const { yamlCode, handleExport, loadFiles } = useCompose();
+
     const [editMode, setEditMode] = useState(false);
     const [editValue, setEditValue] = useState('');
     const [copied, setCopied] = useState(false);
@@ -89,11 +93,11 @@ export const CodePreview = ({ yaml: yamlCode, onYamlChange, onExport, onImport }
     };
 
     const handleSave = () => {
-        try {
-            onYamlChange(editValue);
+        const result = loadFiles(editValue);
+        if (result.success) {
             setEditMode(false);
-        } catch (e) {
-            alert('Invalid YAML: ' + e.message);
+        } else {
+            alert('Invalid YAML: ' + result.error);
         }
     };
 
@@ -101,7 +105,12 @@ export const CodePreview = ({ yaml: yamlCode, onYamlChange, onExport, onImport }
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = (e) => onImport(e.target?.result);
+            reader.onload = (e) => {
+                const result = loadFiles(e.target?.result);
+                if (!result.success) {
+                    alert('Invalid YAML: ' + result.error);
+                }
+            };
             reader.readAsText(file);
         }
     };
@@ -126,7 +135,7 @@ export const CodePreview = ({ yaml: yamlCode, onYamlChange, onExport, onImport }
                         <>
                             <IconButton icon={copied ? CheckCircle : Copy} onClick={handleCopy} title="Copy" />
                             <IconButton icon={Eye} onClick={handleEdit} title="Edit" />
-                            <IconButton icon={Download} onClick={onExport} title="Export" />
+                            <IconButton icon={Download} onClick={handleExport} title="Export" />
                             <IconButton icon={Upload} onClick={() => fileInputRef.current?.click()} title="Import" />
                             <input ref={fileInputRef} type="file" accept=".yml,.yaml" className="hidden" onChange={handleFileSelect} />
                         </>

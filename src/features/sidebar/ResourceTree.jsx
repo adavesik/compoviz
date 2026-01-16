@@ -1,12 +1,19 @@
 import React from 'react';
 import { Server, Network, Database, Key, FileText, Plus, Trash2, AlertCircle } from 'lucide-react';
 import { Badge, IconButton } from '../../components/ui';
+import { useCompose } from '../../hooks/useCompose.jsx';
+import { useUI } from '../../context/UIContext';
 
 /**
  * Resource tree navigation component for sidebar
  * Displays all compose resources in a hierarchical tree
  */
-export const ResourceTree = ({ state, selected, onSelect, onAdd, onDelete, errors, searchTerm }) => {
+export const ResourceTree = ({ onSelect, onAdd, onDelete }) => {
+    // Get compose state from context
+    const { state, errors } = useCompose();
+    // Get UI state from context  
+    const { selected, searchTerm } = useUI();
+
     const categories = [
         { key: 'services', label: 'Services', icon: Server, color: 'text-cyber-accent' },
         { key: 'networks', label: 'Networks', icon: Network, color: 'text-cyber-success' },
