@@ -5,6 +5,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Set Vercel analytics disabled for Docker builds
+ENV VITE_DISABLE_VERCEL_ANALYTICS=true
+
 # Install dependencies first (better layer caching)
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \

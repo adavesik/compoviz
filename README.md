@@ -78,7 +78,7 @@
 - [Node.js](https://nodejs.org/) (v18 or higher)
 - [npm](https://www.npmjs.com/)
 
-### Installation
+### Local Installation
 
 1. Clone the repository:
 
@@ -94,6 +94,11 @@
    ```
 
 3. Start the development server:
+
+   ```bash
+   # Optional: To disable Vercel Analytics just copy the .env.example file with:
+   cp .env.example .env
+   ```
 
    ```bash
    npm run dev
@@ -137,7 +142,7 @@ docker compose up -d
 # Access the app at http://localhost:8080 or your port configuration
 ```
 
-### Build & Deploy from Source
+### Build Docker Image & Deploy from Source
 
 #### First clone and cd into repository
 
