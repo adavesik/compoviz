@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: my-app/frontend:v1.1
+    ports:
+      - "8080:80" # Changed port mapping
+    networks:
+      - app-net
+    depends_on:
+      - backend
+
+  backend:
+    image: my-app/backend:v1.1 # Updated image version
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - NODE_ENV=production
+      - LOG_LEVEL=debug # Added env var
+    networks:
+      - app-net
+      - db-net
+    depends_on:
+      - db
+      - redis # Added dependency
+
+  db:
+    image: postgres:14 # Upgraded database
+    environment:
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=myapp
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - db-net
+
+  redis:
+    # New service added
+    image: redis:alpine
+    networks:
+      - db-net
+
+networks:
+  app-net:
+    driver: bridge
+  db-net:
+    driver: bridge
+
+volumes:
+  db-data:

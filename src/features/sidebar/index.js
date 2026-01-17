@@ -3,3 +3,4 @@
  */
 export { ResourceTree } from './ResourceTree';
 export { IssuesPanel } from './IssuesPanel';
+export { ProfilesPanel } from './ProfilesPanel.jsx';
