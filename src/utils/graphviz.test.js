@@ -139,5 +139,24 @@ describe('graphviz utils', () => {
             expect(dot).toMatch(/label="udp"/);
             expect(dot).toMatch(/label="tcp"/);
         });
+
+        it('handles parser metadata objects correctly', () => {
+            const state = {
+                services: {
+                    web: {
+                        image: { _value: 'nginx' },
+                        ports: [{ _value: '80:80' }],
+                        volumes: [{ _value: 'data:/data' }]
+                    }
+                },
+                volumes: {
+                    data: {}
+                }
+            };
+            const dot = generateGraphviz(state);
+            expect(dot).toContain('label="80"');
+            expect(dot).toContain('nginx');
+            expect(dot).toContain('vol_data');
+        });
     });
 });

@@ -1,0 +1,755 @@
+version: '3.8'
+services:
+  service_1:
+    image: alpine:3.18
+    command: echo "Service 1"
+    environment:
+      SERVICE_ID: 1
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: none
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_2:
+    image: alpine:3.18
+    command: echo "Service 2"
+    environment:
+      SERVICE_ID: 2
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_1
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_3:
+    image: alpine:3.18
+    command: echo "Service 3"
+    environment:
+      SERVICE_ID: 3
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_2
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_4:
+    image: alpine:3.18
+    command: echo "Service 4"
+    environment:
+      SERVICE_ID: 4
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_3
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_5:
+    image: alpine:3.18
+    command: echo "Service 5"
+    environment:
+      SERVICE_ID: 5
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_4
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_6:
+    image: alpine:3.18
+    command: echo "Service 6"
+    environment:
+      SERVICE_ID: 6
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_5
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_7:
+    image: alpine:3.18
+    command: echo "Service 7"
+    environment:
+      SERVICE_ID: 7
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_6
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_8:
+    image: alpine:3.18
+    command: echo "Service 8"
+    environment:
+      SERVICE_ID: 8
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_7
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_9:
+    image: alpine:3.18
+    command: echo "Service 9"
+    environment:
+      SERVICE_ID: 9
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_8
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_10:
+    image: alpine:3.18
+    command: echo "Service 10"
+    environment:
+      SERVICE_ID: 10
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_9
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_11:
+    image: alpine:3.18
+    command: echo "Service 11"
+    environment:
+      SERVICE_ID: 11
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_10
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_12:
+    image: alpine:3.18
+    command: echo "Service 12"
+    environment:
+      SERVICE_ID: 12
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_11
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_13:
+    image: alpine:3.18
+    command: echo "Service 13"
+    environment:
+      SERVICE_ID: 13
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_12
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_14:
+    image: alpine:3.18
+    command: echo "Service 14"
+    environment:
+      SERVICE_ID: 14
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_13
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_15:
+    image: alpine:3.18
+    command: echo "Service 15"
+    environment:
+      SERVICE_ID: 15
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_14
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_16:
+    image: alpine:3.18
+    command: echo "Service 16"
+    environment:
+      SERVICE_ID: 16
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_15
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_17:
+    image: alpine:3.18
+    command: echo "Service 17"
+    environment:
+      SERVICE_ID: 17
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_16
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_18:
+    image: alpine:3.18
+    command: echo "Service 18"
+    environment:
+      SERVICE_ID: 18
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_17
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_19:
+    image: alpine:3.18
+    command: echo "Service 19"
+    environment:
+      SERVICE_ID: 19
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_18
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_20:
+    image: alpine:3.18
+    command: echo "Service 20"
+    environment:
+      SERVICE_ID: 20
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_19
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_21:
+    image: alpine:3.18
+    command: echo "Service 21"
+    environment:
+      SERVICE_ID: 21
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_20
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_22:
+    image: alpine:3.18
+    command: echo "Service 22"
+    environment:
+      SERVICE_ID: 22
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_21
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_23:
+    image: alpine:3.18
+    command: echo "Service 23"
+    environment:
+      SERVICE_ID: 23
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_22
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_24:
+    image: alpine:3.18
+    command: echo "Service 24"
+    environment:
+      SERVICE_ID: 24
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_23
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_25:
+    image: alpine:3.18
+    command: echo "Service 25"
+    environment:
+      SERVICE_ID: 25
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_24
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_26:
+    image: alpine:3.18
+    command: echo "Service 26"
+    environment:
+      SERVICE_ID: 26
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_25
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_27:
+    image: alpine:3.18
+    command: echo "Service 27"
+    environment:
+      SERVICE_ID: 27
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_26
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_28:
+    image: alpine:3.18
+    command: echo "Service 28"
+    environment:
+      SERVICE_ID: 28
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_27
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_29:
+    image: alpine:3.18
+    command: echo "Service 29"
+    environment:
+      SERVICE_ID: 29
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_28
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_30:
+    image: alpine:3.18
+    command: echo "Service 30"
+    environment:
+      SERVICE_ID: 30
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_29
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_31:
+    image: alpine:3.18
+    command: echo "Service 31"
+    environment:
+      SERVICE_ID: 31
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_30
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_32:
+    image: alpine:3.18
+    command: echo "Service 32"
+    environment:
+      SERVICE_ID: 32
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_31
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_33:
+    image: alpine:3.18
+    command: echo "Service 33"
+    environment:
+      SERVICE_ID: 33
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_32
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_34:
+    image: alpine:3.18
+    command: echo "Service 34"
+    environment:
+      SERVICE_ID: 34
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_33
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_35:
+    image: alpine:3.18
+    command: echo "Service 35"
+    environment:
+      SERVICE_ID: 35
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_34
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_36:
+    image: alpine:3.18
+    command: echo "Service 36"
+    environment:
+      SERVICE_ID: 36
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_35
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_37:
+    image: alpine:3.18
+    command: echo "Service 37"
+    environment:
+      SERVICE_ID: 37
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_36
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_38:
+    image: alpine:3.18
+    command: echo "Service 38"
+    environment:
+      SERVICE_ID: 38
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_37
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_39:
+    image: alpine:3.18
+    command: echo "Service 39"
+    environment:
+      SERVICE_ID: 39
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_38
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_40:
+    image: alpine:3.18
+    command: echo "Service 40"
+    environment:
+      SERVICE_ID: 40
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_39
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_41:
+    image: alpine:3.18
+    command: echo "Service 41"
+    environment:
+      SERVICE_ID: 41
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_40
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_42:
+    image: alpine:3.18
+    command: echo "Service 42"
+    environment:
+      SERVICE_ID: 42
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_41
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_43:
+    image: alpine:3.18
+    command: echo "Service 43"
+    environment:
+      SERVICE_ID: 43
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_42
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_44:
+    image: alpine:3.18
+    command: echo "Service 44"
+    environment:
+      SERVICE_ID: 44
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_43
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_45:
+    image: alpine:3.18
+    command: echo "Service 45"
+    environment:
+      SERVICE_ID: 45
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_44
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_46:
+    image: alpine:3.18
+    command: echo "Service 46"
+    environment:
+      SERVICE_ID: 46
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_45
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_47:
+    image: alpine:3.18
+    command: echo "Service 47"
+    environment:
+      SERVICE_ID: 47
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_46
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_48:
+    image: alpine:3.18
+    command: echo "Service 48"
+    environment:
+      SERVICE_ID: 48
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_47
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_49:
+    image: alpine:3.18
+    command: echo "Service 49"
+    environment:
+      SERVICE_ID: 49
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_48
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+  service_50:
+    image: alpine:3.18
+    command: echo "Service 50"
+    environment:
+      SERVICE_ID: 50
+      GLOBAL_VAR: ${GLOBAL:-default}
+      DEPENDS_ON: service_49
+    networks:
+      - mesh_network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 50M
+networks:
+  mesh_network:
+    driver: overlay

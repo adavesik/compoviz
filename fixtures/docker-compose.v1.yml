@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: my-app/frontend:v1.0
+    ports:
+      - "80:80"
+    networks:
+      - app-net
+    depends_on:
+      - backend
+
+  backend:
+    image: my-app/backend:v1.0
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - NODE_ENV=production
+    networks:
+      - app-net
+      - db-net
+    depends_on:
+      - db
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=myapp
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - db-net
+
+networks:
+  app-net:
+    driver: bridge
+  db-net:
+    driver: bridge
+
+volumes:
+  db-data:

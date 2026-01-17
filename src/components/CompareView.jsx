@@ -15,11 +15,12 @@ const DiagramView = memo(({ projects, conflicts }) => {
     const [scale, setScale] = useState(0.8);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [dragging, setDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [error, setError] = useState(null);
     const scaleRef = useRef(scale);
     const positionRef = useRef(position);
     const diagramSizeRef = useRef({ width: 0, height: 0 });
+    const dragStartRef = useRef({ x: 0, y: 0 });
+    const draggingRef = useRef(false);
 
     // Lock page scrolling while the compare diagram is active
     useEffect(() => {
@@ -53,8 +54,32 @@ const DiagramView = memo(({ projects, conflicts }) => {
                     svgElement.style.maxWidth = 'none';
                     svgElement.style.maxHeight = 'none';
 
-                    const bbox = svgElement.getBBox();
-                    diagramSizeRef.current = { width: bbox.width, height: bbox.height };
+                    let width = 0;
+                    let height = 0;
+                    try {
+                        const bbox = svgElement.getBBox();
+                        width = bbox.width;
+                        height = bbox.height;
+                    } catch {
+                        // Ignore bbox errors for detached SVGs
+                    }
+
+                    if (!width || !height) {
+                        const viewBox = svgElement.viewBox?.baseVal;
+                        if (viewBox) {
+                            width = viewBox.width;
+                            height = viewBox.height;
+                        }
+                    }
+
+                    if (!width || !height) {
+                        const attrWidth = parseFloat(svgElement.getAttribute('width') || '0');
+                        const attrHeight = parseFloat(svgElement.getAttribute('height') || '0');
+                        width = attrWidth;
+                        height = attrHeight;
+                    }
+
+                    diagramSizeRef.current = { width, height };
                 }
             } catch (e) {
                 if (cancelled) return;
@@ -84,8 +109,10 @@ const DiagramView = memo(({ projects, conflicts }) => {
         const scaledWidth = effectiveWidth * nextScale;
         const scaledHeight = effectiveHeight * nextScale;
 
-        const maxOffsetX = Math.max(0, (scaledWidth - viewport.clientWidth) / 2);
-        const maxOffsetY = Math.max(0, (scaledHeight - viewport.clientHeight) / 2);
+        const paddingX = Math.max(120, viewport.clientWidth * 0.4);
+        const paddingY = Math.max(120, viewport.clientHeight * 0.4);
+        const maxOffsetX = Math.max(paddingX, (scaledWidth - viewport.clientWidth) / 2 + paddingX);
+        const maxOffsetY = Math.max(paddingY, (scaledHeight - viewport.clientHeight) / 2 + paddingY);
 
         return {
             x: Math.min(Math.max(nextPosition.x, -maxOffsetX), maxOffsetX),
@@ -97,17 +124,16 @@ const DiagramView = memo(({ projects, conflicts }) => {
         if (e.button !== 0) return;
         e.preventDefault();
         setDragging(true);
-        setDragStart({
+        draggingRef.current = true;
+        dragStartRef.current = {
             x: e.clientX - positionRef.current.x,
             y: e.clientY - positionRef.current.y,
-        });
+        };
     };
-    const handleMouseMove = (e) => {
-        if (!dragging) return;
-        const nextPosition = { x: e.clientX - dragStart.x, y: e.clientY - dragStart.y };
-        setPosition(clampPosition(nextPosition, scaleRef.current));
+    const handleMouseUp = () => {
+        draggingRef.current = false;
+        setDragging(false);
     };
-    const handleMouseUp = () => setDragging(false);
     const updateScale = useCallback((getNextScale) => {
         setScale((currentScale) => {
             const nextScale = getNextScale(currentScale);
@@ -165,6 +191,29 @@ const DiagramView = memo(({ projects, conflicts }) => {
         return () => element.removeEventListener('wheel', handleWheel, { capture: true });
     }, [handleWheel]);
 
+    useEffect(() => {
+        if (!dragging) return;
+
+        const handleMove = (e) => {
+            if (!draggingRef.current) return;
+            const nextPosition = {
+                x: e.clientX - dragStartRef.current.x,
+                y: e.clientY - dragStartRef.current.y,
+            };
+            setPosition(clampPosition(nextPosition, scaleRef.current));
+        };
+
+        const handleUp = () => handleMouseUp();
+
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleUp);
+        };
+    }, [dragging, clampPosition]);
+
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center h-full p-8 text-center text-cyber-error">
@@ -192,8 +241,6 @@ const DiagramView = memo(({ projects, conflicts }) => {
             <div
                 className="mermaid-container"
                 onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
             >
@@ -204,8 +251,8 @@ const DiagramView = memo(({ projects, conflicts }) => {
                         transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                         transformOrigin: 'center center',
                         transition: dragging ? 'none' : 'transform 0.2s',
-                        pointerEvents: dragging ? 'none' : 'auto',
                         willChange: 'transform',
+                        cursor: dragging ? 'grabbing' : 'grab',
                     }}
                 />
             </div>
