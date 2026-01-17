@@ -1,0 +1,27 @@
+name: inline-content-demo
+
+services:
+  web:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    configs:
+      - source: my_nginx_config
+        target: /etc/nginx/conf.d/default.conf
+    secrets:
+      - source: api_key
+        target: /run/secrets/api_key
+
+configs:
+  my_nginx_config:
+    content: |
+      server {
+        listen 80;
+        location / {
+          return 200 "Hello from Inline Config!\n";
+        }
+      }
+
+secrets:
+  api_key:
+    content: "sk-1234567890abcdef"

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: my-app/frontend:v2.0 # Major version update
+    ports:
+      - "80:80"
+    networks:
+      - app-net
+    depends_on:
+      - api-gateway
+
+  # Backend split into microservices
+  api-gateway:
+    image: my-app/api-gateway:v1.0
+    ports:
+      - "3000:3000"
+    networks:
+      - app-net
+      - internal-net
+
+  auth-service:
+    image: my-app/auth:v1.0
+    environment:
+      - JWT_SECRET=change-me
+    networks:
+      - internal-net
+      - db-net
+    depends_on:
+      - db
+
+  # Renamed/Different DB service config
+  db:
+    image: postgres:14
+    environment:
+      - POSTGRES_PASSWORD=new-secret-password # Changed password
+      - POSTGRES_DB=myapp_v2
+    volumes:
+      - db-data-v2:/var/lib/postgresql/data # Changed volume
+    networks:
+      - db-net
+
+networks:
+  app-net:
+    driver: bridge
+  db-net:
+    driver: bridge
+  internal-net:
+    # New network
+    driver: bridge
+
+volumes:
+  db-data: null # Removed volume reference in usage, kept here for diff
+  db-data-v2: # New volume
