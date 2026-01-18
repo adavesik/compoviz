@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Code, Download, Upload, CheckCircle, X, Eye, Copy } from 'lucide-react';
+import { Code, Download, Upload, CheckCircle, X, Eye, Copy, Folder } from 'lucide-react';
 import { IconButton } from '../../components/ui';
 import { useCompose } from '../../hooks/useCompose.jsx';
 
@@ -14,6 +14,7 @@ export const CodePreview = () => {
     const [editValue, setEditValue] = useState('');
     const [copied, setCopied] = useState(false);
     const fileInputRef = useRef(null);
+    const folderInputRef = useRef(null);
 
     const splitComment = (line) => {
         const hashIndex = line.indexOf('#');
@@ -92,26 +93,41 @@ export const CodePreview = () => {
         setEditMode(true);
     };
 
-    const handleSave = () => {
-        const result = loadFiles(editValue);
-        if (result.success) {
-            setEditMode(false);
-        } else {
-            alert('Invalid YAML: ' + result.error);
+    const handleSave = async () => {
+        try {
+            const result = await loadFiles(editValue);
+            if (result.success) {
+                setEditMode(false);
+            } else {
+                alert('Invalid YAML: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Save failed:', error);
+            alert('Save failed: ' + error.message);
         }
     };
 
-    const handleFileSelect = (e) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const result = loadFiles(e.target?.result);
-                if (!result.success) {
-                    alert('Invalid YAML: ' + result.error);
-                }
-            };
-            reader.readAsText(file);
+    const handleFileSelect = async (e) => {
+        const files = Array.from(e.target.files || []).filter((file) => (
+            file.name.endsWith('.yml') || file.name.endsWith('.yaml') || file.name === '.env'
+        ));
+        if (files.length === 0) return;
+
+        const primaryFile = files.find((file) => (
+            file.name === 'docker-compose.yml' || file.name === 'docker-compose.yaml'
+        )) || files[0];
+
+        const orderedFiles = [primaryFile, ...files.filter((file) => file !== primaryFile)];
+
+        try {
+            const content = await primaryFile.text();
+            const result = await loadFiles(content, orderedFiles);
+            if (!result.success) {
+                alert('Invalid YAML: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Import failed:', error);
+            alert('Import failed: ' + error.message);
         }
     };
 
@@ -136,8 +152,10 @@ export const CodePreview = () => {
                             <IconButton icon={copied ? CheckCircle : Copy} onClick={handleCopy} title="Copy" />
                             <IconButton icon={Eye} onClick={handleEdit} title="Edit" />
                             <IconButton icon={Download} onClick={handleExport} title="Export" />
-                            <IconButton icon={Upload} onClick={() => fileInputRef.current?.click()} title="Import" />
-                            <input ref={fileInputRef} type="file" accept=".yml,.yaml" className="hidden" onChange={handleFileSelect} />
+                            <IconButton icon={Upload} onClick={() => fileInputRef.current?.click()} title="Import Files" />
+                            <IconButton icon={Folder} onClick={() => folderInputRef.current?.click()} title="Import Folder" />
+                            <input ref={fileInputRef} type="file" accept=".yml,.yaml,.env" multiple className="hidden" onChange={handleFileSelect} />
+                            <input ref={folderInputRef} type="file" accept=".yml,.yaml,.env" webkitdirectory="true" className="hidden" onChange={handleFileSelect} />
                         </>
                     )}
                 </div>

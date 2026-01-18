@@ -24,11 +24,16 @@ export const IssuesPanel = ({ errors, onSelect }) => {
 
             {expanded && (
                 <div className="mt-3 space-y-2 max-h-48 overflow-auto animate-fade-in">
-                    {errors.map((error, idx) => (
+                    {errors.map((error, idx) => {
+                        const canSelect = error.entity && error.name && error.entity !== 'parser';
+                        return (
                         <div
                             key={idx}
-                            onClick={() => onSelect({ type: error.entity + 's', name: error.name })}
-                            className={`p-2 rounded-lg border cursor-pointer transition-all hover:brightness-110 ${error.type === 'error'
+                            onClick={() => {
+                                if (!canSelect) return;
+                                onSelect({ type: error.entity + 's', name: error.name });
+                            }}
+                            className={`p-2 rounded-lg border transition-all hover:brightness-110 ${canSelect ? 'cursor-pointer' : 'cursor-default'} ${error.type === 'error'
                                     ? 'bg-cyber-error/10 border-cyber-error/30'
                                     : 'bg-cyber-warning/10 border-cyber-warning/30'
                                 }`}
@@ -41,13 +46,16 @@ export const IssuesPanel = ({ errors, onSelect }) => {
                                 )}
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-medium truncate">{error.message}</p>
-                                    <p className="text-xs text-cyber-text-muted mt-0.5">
-                                        {error.entity}: <span className="text-cyber-accent">{error.name}</span>
-                                    </p>
+                                    {error.entity && error.name && (
+                                        <p className="text-xs text-cyber-text-muted mt-0.5">
+                                            {error.entity}: <span className="text-cyber-accent">{error.name}</span>
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

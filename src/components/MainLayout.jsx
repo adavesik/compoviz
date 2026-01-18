@@ -22,6 +22,7 @@ import { GraphvizDiagram } from '../features/diagram';
 import { CodePreview } from '../features/code-preview';
 import { TemplateModal } from './modals';
 import CompareView from './CompareView';
+import { ProfilesPanel } from '../features/sidebar';
 
 // Lazy load the Visual Builder (React Flow) - only loads when user clicks Build tab
 const VisualBuilder = lazy(() => import('./VisualBuilder'));
@@ -107,15 +108,20 @@ export default function MainLayout() {
         dispatch({ type: `UPDATE_${selected.type.slice(0, -1).toUpperCase()}`, name: selected.name, data });
     }, [selected, dispatch]);
 
-    const handleImport = (content) => {
-        const result = loadFiles(content);
-        if (!result.success) {
-            alert('Invalid YAML: ' + result.error);
-            return;
-        }
-        // On mobile, switch to diagram mode to show the imported config visualized
-        if (isMobile) {
-            setActiveView('diagram');
+    const handleImport = async (content, files = []) => {
+        try {
+            const result = await loadFiles(content, files);
+            if (!result.success) {
+                alert('Invalid YAML: ' + (result.error || 'Unknown error'));
+                return;
+            }
+            // On mobile, switch to diagram mode to show the imported config visualized
+            if (isMobile) {
+                setActiveView('diagram');
+            }
+        } catch (error) {
+            console.error('Import failed:', error);
+            alert('Import failed: ' + error.message);
         }
     };
 
@@ -138,6 +144,59 @@ export default function MainLayout() {
         }
     };
 
+    const collectDroppedFiles = async (dataTransfer) => {
+        const files = [];
+        const items = Array.from(dataTransfer?.items || []);
+
+        const readFileEntry = (entry) => new Promise((resolve) => {
+            entry.file((file) => resolve(file));
+        });
+
+        const readAllEntries = async (reader) => new Promise((resolve) => {
+            const entries = [];
+            const readChunk = () => {
+                reader.readEntries((batch) => {
+                    if (!batch.length) {
+                        resolve(entries);
+                        return;
+                    }
+                    entries.push(...batch);
+                    readChunk();
+                });
+            };
+            readChunk();
+        });
+
+        const walkEntry = async (entry) => {
+            if (!entry) return;
+            if (entry.isFile) {
+                const file = await readFileEntry(entry);
+                files.push({ file, fullPath: entry.fullPath });
+                return;
+            }
+            if (entry.isDirectory) {
+                const reader = entry.createReader();
+                const entries = await readAllEntries(reader);
+                for (const child of entries) {
+                    await walkEntry(child);
+                }
+            }
+        };
+
+        const entries = items
+            .map((item) => item.webkitGetAsEntry?.())
+            .filter(Boolean);
+
+        if (entries.length > 0) {
+            for (const entry of entries) {
+                await walkEntry(entry);
+            }
+            return files;
+        }
+
+        return Array.from(dataTransfer?.files || []).map((file) => ({ file, fullPath: '' }));
+    };
+
     // Render the appropriate editor based on selection
     const renderEditor = () => {
         if (!selected) return (
@@ -145,15 +204,27 @@ export default function MainLayout() {
                 className={`h-full flex flex-col items-center justify-center text-cyber-text-muted border-2 border-dashed rounded-xl transition-all duration-300 m-4 ${isDragging ? 'border-cyber-accent bg-cyber-accent/5' : 'border-transparent'}`}
                 onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={e => { e.preventDefault(); setIsDragging(false); }}
-                onDrop={e => {
+                onDrop={async (e) => {
                     e.preventDefault();
                     setIsDragging(false);
-                    const file = e.dataTransfer.files[0];
-                    if (file && (file.name.endsWith('.yml') || file.name.endsWith('.yaml'))) {
-                        const reader = new FileReader();
-                        reader.onload = (e) => handleImport(e.target?.result);
-                        reader.readAsText(file);
-                    }
+                    const droppedFiles = await collectDroppedFiles(e.dataTransfer);
+                    const files = droppedFiles.filter(({ file }) => (
+                        file.name.endsWith('.yml') || file.name.endsWith('.yaml') || file.name === '.env'
+                    )).map(({ file, fullPath }) => {
+                        if (!fullPath) return file;
+                        return {
+                            name: file.name,
+                            webkitRelativePath: fullPath.replace(/^\//, ''),
+                            text: () => file.text()
+                        };
+                    });
+                    if (files.length === 0) return;
+                    const primaryFile = files.find((file) => (
+                        file.name === 'docker-compose.yml' || file.name === 'docker-compose.yaml'
+                    )) || files[0];
+                    const orderedFiles = [primaryFile, ...files.filter((file) => file !== primaryFile)];
+                    const content = await primaryFile.text();
+                    handleImport(content, orderedFiles);
                 }}
             >
                 <Layers size={48} className={`mb-4 transition-all duration-300 ${isDragging ? 'text-cyber-accent scale-110' : 'opacity-50'}`} />
@@ -177,18 +248,45 @@ export default function MainLayout() {
 
                     <label className="btn btn-secondary cursor-pointer gap-2 flex items-center px-6 hover:bg-cyber-surface-light transition-all">
                         <Upload size={16} />
-                        <span>Import File</span>
+                        <span>Import Files</span>
                         <input
                             type="file"
-                            accept=".yml,.yaml"
+                            accept=".yml,.yaml,.env"
+                            multiple
                             className="hidden"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                    const reader = new FileReader();
-                                    reader.onload = (e) => handleImport(e.target?.result);
-                                    reader.readAsText(file);
-                                }
+                            onChange={async (e) => {
+                                const files = Array.from(e.target.files || []).filter((file) => (
+                                    file.name.endsWith('.yml') || file.name.endsWith('.yaml') || file.name === '.env'
+                                ));
+                                if (files.length === 0) return;
+                                const primaryFile = files.find((file) => (
+                                    file.name === 'docker-compose.yml' || file.name === 'docker-compose.yaml'
+                                )) || files[0];
+                                const orderedFiles = [primaryFile, ...files.filter((file) => file !== primaryFile)];
+                                const content = await primaryFile.text();
+                                handleImport(content, orderedFiles);
+                            }}
+                        />
+                    </label>
+                    <label className="btn btn-secondary cursor-pointer gap-2 flex items-center px-6 hover:bg-cyber-surface-light transition-all">
+                        <Upload size={16} />
+                        <span>Import Folder</span>
+                        <input
+                            type="file"
+                            accept=".yml,.yaml,.env"
+                            webkitdirectory="true"
+                            className="hidden"
+                            onChange={async (e) => {
+                                const files = Array.from(e.target.files || []).filter((file) => (
+                                    file.name.endsWith('.yml') || file.name.endsWith('.yaml') || file.name === '.env'
+                                ));
+                                if (files.length === 0) return;
+                                const primaryFile = files.find((file) => (
+                                    file.name === 'docker-compose.yml' || file.name === 'docker-compose.yaml'
+                                )) || files[0];
+                                const orderedFiles = [primaryFile, ...files.filter((file) => file !== primaryFile)];
+                                const content = await primaryFile.text();
+                                handleImport(content, orderedFiles);
                             }}
                         />
                     </label>
@@ -282,6 +380,9 @@ export default function MainLayout() {
                         />
                         <button onClick={() => handleAdd('services')} className="btn btn-primary w-full flex items-center justify-center gap-2"><Plus size={16} />Add Service</button>
                         <button onClick={() => setShowTemplates(true)} className="btn btn-secondary w-full flex items-center justify-center gap-2"><Sparkles size={16} />From Template</button>
+                    </div>
+                    <div className="p-2 border-b border-cyber-border/50">
+                        <ProfilesPanel />
                     </div>
                     <div className="flex-1 overflow-auto p-2">
                         <ResourceTree onSelect={(sel) => { setSelected(sel); if (isMobile) setSidebarOpen(false); }} onAdd={handleAdd} onDelete={handleDelete} />

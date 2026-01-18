@@ -4,16 +4,30 @@ import { getServiceEmoji } from './iconUtils.jsx';
 /**
  * Escape special characters for Graphviz labels
  */
+/**
+ * Get the underlying value from a possibly metadata-wrapped object
+ */
+const getValue = (val) => {
+    if (val && typeof val === 'object' && '_value' in val) {
+        return val._value;
+    }
+    return val;
+};
+
+/**
+ * Escape special characters for Graphviz labels
+ */
 export const escapeLabel = (str) => {
     if (!str) return '';
-    return String(str)
+    return String(getValue(str)) // Ensure we unwrap value first
         .replace(/\\/g, '\\\\')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/\n/g, ' ');
+        .replace(/\n/g, '\\n'); // Support multiline labels
 };
+
 
 /**
  * Extract depends_on condition from long syntax
@@ -63,7 +77,7 @@ const COLORS = {
  * Classify a service into a tier based on its image/name
  */
 const classifyServiceTier = (name, svc) => {
-    const image = (svc.image || '').toLowerCase();
+    const image = (getValue(svc.image) || '').toLowerCase();
     const serviceName = name.toLowerCase();
 
     // Database/persistence tier
@@ -80,9 +94,10 @@ const classifyServiceTier = (name, svc) => {
     }
 
     // If service has ports exposed, it might be an entry point or routing
-    const ports = normalizeArray(svc.ports);
+    const ports = normalizeArray(getValue(svc.ports));
     if (ports.length > 0) {
-        const hasCommonPorts = ports.some(p => {
+        const hasCommonPorts = ports.some(portRaw => {
+            const p = getValue(portRaw);
             const portStr = typeof p === 'string' ? p : String(p.published);
             return ['80', '443', '8080', '8443', '4443'].includes(portStr.split(':')[0]);
         });
@@ -121,7 +136,8 @@ export const generateGraphviz = (state) => {
     // 2. Collect Ports (Ingress Zone)
     const allPorts = [];
     Object.entries(services).forEach(([name, svc]) => {
-        normalizeArray(svc.ports).forEach((port, idx) => {
+        normalizeArray(getValue(svc.ports)).forEach((portRaw, idx) => {
+            const port = getValue(portRaw);
             let hostPort, protocol;
             if (typeof port === 'string') {
                 // Parse string format: supports IPv4, IPv6, and all Docker Compose formats
@@ -196,7 +212,8 @@ export const generateGraphviz = (state) => {
     // Host Paths
     const hostPaths = new Map();
     Object.entries(services).forEach(([, svc]) => {
-        normalizeArray(svc.volumes).forEach(vol => {
+        normalizeArray(getValue(svc.volumes)).forEach(volRaw => {
+            const vol = getValue(volRaw);
             const src = typeof vol === 'string' ? vol.split(':')[0] : '';
             if (src && (src.startsWith('.') || src.startsWith('/'))) {
                 const shortPath = src.length > 20 ? '...' + src.slice(-17) : src;
@@ -299,7 +316,7 @@ export const generateGraphviz = (state) => {
     // Group services by primary network for visual boundaries
     const servicesByNetwork = new Map();
     Object.entries(services).forEach(([name, svc]) => {
-        const net = normalizeArray(svc.networks)[0] || '_default';
+        const net = normalizeArray(getValue(svc.networks))[0] || '_default';
         if (!servicesByNetwork.has(net)) servicesByNetwork.set(net, []);
         servicesByNetwork.get(net).push({ name, svc });
     });
@@ -326,10 +343,11 @@ export const generateGraphviz = (state) => {
             const zone = serviceZones.get(name);
             const tier = serviceTiers.get(name);
             const color = COLORS[tier] || COLORS.application;
-            const img = svc.image ? svc.image.split(':')[0] : 'image';
+            const imageStr = getValue(svc.image);
+            const img = imageStr ? imageStr.split(':')[0] : 'image';
 
             // Get service-specific icon from centralized utility
-            const icon = getServiceEmoji(name, svc.image) + ' ';
+            const icon = getServiceEmoji(name, imageStr) + ' ';
 
             const nodeDef = `
                 ${sanitizeId(name)} [
@@ -430,10 +448,11 @@ export const generateGraphviz = (state) => {
                 const condition = dep.condition.replace('service_', '');
 
                 let label = '';
-                if (condition) label = `\\n(${condition})`;
+                // Don't modify label with special characters before final assembly
+                if (condition) label = `\\n(${escapeLabel(condition)})`;
 
                 dot += `  ${srcId} -> ${depId} [\n`;
-                dot += `    label="${escapeLabel(label)}"\n`;
+                dot += `    label="${label}"\n`; // Use label directly as it's already formatted
                 dot += `    color="${COLORS.edge.network}", style=solid\n`;
                 dot += `    penwidth=1.5\n`;
                 dot += `    fontsize=8\n`;
@@ -452,7 +471,8 @@ export const generateGraphviz = (state) => {
         const svcId = sanitizeId(name);
 
         // Volumes/HostPaths
-        normalizeArray(svc.volumes).forEach(vol => {
+        normalizeArray(getValue(svc.volumes)).forEach(volRaw => {
+            const vol = getValue(volRaw);
             const src = typeof vol === 'string' ? vol.split(':')[0] : '';
             let targetId = null;
             if (src && volumes[src]) targetId = `vol_${sanitizeId(src)}`;
@@ -473,13 +493,15 @@ export const generateGraphviz = (state) => {
         });
 
         // Secrets/Configs
-        normalizeArray(svc.secrets).forEach(s => {
+        normalizeArray(getValue(svc.secrets)).forEach(sRaw => {
+            const s = getValue(sRaw);
             const t = typeof s === 'string' ? s : s.source;
             if (secrets[t]) {
                 dot += `  ${svcId} -> sec_${sanitizeId(t)} [style=dotted, color="${COLORS.edge.config}"]\n`;
             }
         });
-        normalizeArray(svc.configs).forEach(c => {
+        normalizeArray(getValue(svc.configs)).forEach(cRaw => {
+            const c = getValue(cRaw);
             const t = typeof c === 'string' ? c : c.source;
             if (configs[t]) {
                 dot += `  ${svcId} -> cfg_${sanitizeId(t)} [style=dotted, color="${COLORS.edge.config}"]\n`;
@@ -533,7 +555,7 @@ export const generateMultiProjectGraphviz = (projects, conflicts = []) => {
     dot += `  splines=ortho\n`;
     dot += `  fontname="Inter"\n`;
     dot += `  fontsize=10\n`;
-    dot += `  node [fontname="Inter", fontsize=9, style="filled,rounded", shape=box]\n`;
+    dot += `  node [fontname="Inter", fontsize=9, style="filled,rounded", shape=box, margin="0.2,0.12"]\n`;
     dot += `  edge [fontname="Inter", fontsize=8]\n`;
     dot += `  compound=true\n`;
     dot += `  newrank=true\n\n`;
@@ -556,6 +578,21 @@ export const generateMultiProjectGraphviz = (projects, conflicts = []) => {
             const nodeId = `${projectPrefix}${sanitizeId(serviceName)}`;
             const img = svc.image ? svc.image.split(':')[0] : 'build';
             const imgShort = img.length > 15 ? img.slice(0, 12) + '...' : img;
+            const portLabels = normalizeArray(svc.ports)
+                .map((port) => {
+                    if (typeof port === 'string') return port;
+                    if (port && typeof port === 'object') {
+                        const published = port.published || port.target;
+                        const target = port.target || port.published;
+                        if (!published || !target) return '';
+                        return `${published}:${target}`;
+                    }
+                    return '';
+                })
+                .filter(Boolean);
+            const portsPreview = portLabels.length > 0
+                ? `\\n${escapeLabel(portLabels.slice(0, 3).join(', '))}${portLabels.length > 3 ? '…' : ''}`
+                : '';
 
             const serviceKey = `${project.name}:${serviceName}`;
             const hasConflict = conflictPorts.has(serviceKey) || conflictContainers.has(serviceKey);
@@ -563,7 +600,7 @@ export const generateMultiProjectGraphviz = (projects, conflicts = []) => {
             const nodeBorder = hasConflict ? '#ef4444' : color.border;
 
             dot += `    ${nodeId} [\n`;
-            dot += `      label="${escapeLabel(serviceName)}\\n<${escapeLabel(imgShort)}>"\n`;
+            dot += `      label="${escapeLabel(serviceName)}\\n<${escapeLabel(imgShort)}>${portsPreview}"\n`;
             dot += `      fillcolor="${nodeColor}"\n`;
             dot += `      color="${nodeBorder}"\n`;
             dot += `      fontcolor="#ffffff"\n`;
