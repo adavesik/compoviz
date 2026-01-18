@@ -23,6 +23,9 @@ import { CodePreview } from '../features/code-preview';
 import { TemplateModal } from './modals';
 import CompareView from './CompareView';
 import { ProfilesPanel } from '../features/sidebar';
+import { ProfileSelector } from './ProfileSelector.jsx';
+import WhatsNewModal from './WhatsNewModal.jsx';
+import { getExample } from '../data/examples.js';
 
 // Lazy load the Visual Builder (React Flow) - only loads when user clicks Build tab
 const VisualBuilder = lazy(() => import('./VisualBuilder'));
@@ -141,6 +144,23 @@ export default function MainLayout() {
     const handleClearAll = () => {
         if (resetProject()) {
             setSelected(null);
+        }
+    };
+
+    const handleWhatsNewAction = async (action) => {
+        if (!action) return;
+
+        switch (action.type) {
+            case 'load-example': {
+                const exampleYaml = getExample(action.data);
+                if (exampleYaml) {
+                    await handleImport(exampleYaml);
+                    setActiveView('build');
+                }
+                break;
+            }
+            default:
+                break;
         }
     };
 
@@ -338,6 +358,7 @@ export default function MainLayout() {
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-cyber-text-muted" />
                         <input type="text" placeholder="Search resources..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 pr-4 py-2 w-48 lg:w-64 text-sm" />
                     </div>
+                    <ProfileSelector />
                     {/* Error Indicator */}
                     <ErrorIndicator errors={errors} onSelect={setSelected} />
                     {/* View switcher - icons only on mobile */}
@@ -482,6 +503,9 @@ export default function MainLayout() {
                     </div>
                 </div>
             )}
+
+            {/* What's New Modal */}
+            <WhatsNewModal onAction={handleWhatsNewAction} />
 
             {/* Template Modal */}
             {showTemplates && <TemplateModal onSelect={handleAddFromTemplate} onClose={() => setShowTemplates(false)} />}
