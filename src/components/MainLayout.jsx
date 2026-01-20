@@ -2,7 +2,7 @@ import { useCallback, lazy, Suspense } from 'react';
 import {
     Server, Plus, Download, Upload, Search, Menu, Eye, Code,
     Layers, Undo2, Redo2, Sparkles, GitCompare, PenTool,
-    CheckCircle, Globe
+    CheckCircle, Globe, Github
 } from 'lucide-react';
 
 // Hooks
@@ -24,6 +24,7 @@ import { TemplateModal } from './modals';
 import CompareView from './CompareView';
 import { ProfilesPanel } from '../features/sidebar';
 import { ProfileSelector } from './ProfileSelector.jsx';
+import Footer from './Footer.jsx';
 import WhatsNewModal from './WhatsNewModal.jsx';
 import { getExample } from '../data/examples.js';
 
@@ -344,6 +345,17 @@ export default function MainLayout() {
                             <h1 className="text-xl font-bold bg-gradient-to-r from-cyber-accent to-cyber-purple bg-clip-text text-transparent">Compoviz</h1>
                             <p className="text-[8px] uppercase tracking-[0.2em] text-cyber-accent font-semibold leading-none">Visual Architect</p>
                         </div>
+                        {/* GitHub Link - subtle, next to logo */}
+                        <a
+                            href="https://github.com/adavesik/compoviz"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-2 p-1.5 hover:bg-cyber-surface-light rounded-lg transition-colors opacity-60 hover:opacity-100 hidden sm:flex"
+                            title="View on GitHub"
+                            aria-label="View on GitHub"
+                        >
+                            <Github size={16} className="text-cyber-text-muted" />
+                        </a>
                     </div>
                 </div>
 
@@ -481,6 +493,9 @@ export default function MainLayout() {
                     )}
                 </main>
             </div>
+
+            {/* Footer */}
+            {activeView !== 'compare' && <Footer />}
 
             {/* Mobile YAML Toggle - View Code button */}
             <div className="xl:hidden fixed bottom-4 right-4 flex gap-2">
