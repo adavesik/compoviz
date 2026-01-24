@@ -622,6 +622,36 @@ textarea::placeholder {
   @apply text-xs bg-cyber-surface-light rounded-full px-1.5;
 }
 
+/* Suggestion Badges */
+.suggestion-badge {
+  @apply inline-flex items-center justify-center ml-auto text-[10px] font-bold rounded-full min-w-[16px] h-[16px] px-1 transition-all duration-200 shadow-sm;
+}
+
+.suggestion-badge.severity-critical {
+  @apply bg-cyber-error text-white;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.suggestion-badge.severity-high {
+  @apply bg-cyber-error/80 text-white;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.3);
+}
+
+.suggestion-badge.severity-medium {
+  @apply bg-cyber-warning text-cyber-bg;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+}
+
+.suggestion-badge.severity-low {
+  @apply bg-cyber-accent/80 text-white;
+  box-shadow: 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+.suggestion-badge.severity-info {
+  @apply bg-cyber-text-muted/50 text-white;
+}
+
+
 /* Connection Handles */
 .builder-handle {
   @apply w-3 h-3 rounded-full border-2;
@@ -716,6 +746,28 @@ textarea::placeholder {
   @apply text-cyber-text-muted hover:text-cyber-accent;
   @apply hover:bg-cyber-surface-light;
 }
+
+.builder-action-btn.has-suggestions {
+  @apply text-cyber-warning;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.builder-action-btn.has-suggestions:hover {
+  @apply text-cyber-warning bg-cyber-warning/10;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
+
 
 /* ========================================
    Builder Legend

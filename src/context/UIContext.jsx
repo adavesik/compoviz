@@ -32,6 +32,17 @@ export function UIProvider({ children }) {
     // Drag state
     const [isDragging, setIsDragging] = useState(false);
 
+    // Suggestions state (persisted to localStorage)
+    const [suggestionsEnabled, setSuggestionsEnabled] = useState(() => {
+        const saved = localStorage.getItem('suggestions-enabled');
+        if (saved === null || saved === 'undefined') return true;
+        try {
+            return JSON.parse(saved);
+        } catch {
+            return true;
+        }
+    });
+
     // Handle window resize for responsive behavior
     useEffect(() => {
         const handleResize = () => {
@@ -71,6 +82,11 @@ export function UIProvider({ children }) {
         };
     }, [isResizing]);
 
+    // Persist suggestions toggle
+    useEffect(() => {
+        localStorage.setItem('suggestions-enabled', JSON.stringify(suggestionsEnabled));
+    }, [suggestionsEnabled]);
+
     // Actions
     const setView = useCallback((viewId) => {
         setActiveView(viewId);
@@ -101,6 +117,7 @@ export function UIProvider({ children }) {
         isResizing,
         showMobileCode,
         isDragging,
+        suggestionsEnabled,
 
         // Setters
         setActiveView: setView,
@@ -112,6 +129,7 @@ export function UIProvider({ children }) {
         setIsResizing,
         setShowMobileCode,
         setIsDragging,
+        setSuggestionsEnabled,
 
         // Actions
         toggleSidebar,

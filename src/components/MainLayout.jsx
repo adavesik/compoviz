@@ -23,7 +23,6 @@ import { CodePreview } from '../features/code-preview';
 import { TemplateModal } from './modals';
 import CompareView from './CompareView';
 import { ProfilesPanel } from '../features/sidebar';
-import { ProfileSelector } from './ProfileSelector.jsx';
 import Footer from './Footer.jsx';
 import WhatsNewModal from './WhatsNewModal.jsx';
 import { getExample } from '../data/examples.js';
@@ -370,7 +369,6 @@ export default function MainLayout() {
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-cyber-text-muted" />
                         <input type="text" placeholder="Search resources..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 pr-4 py-2 w-48 lg:w-64 text-sm" />
                     </div>
-                    <ProfileSelector />
                     {/* Error Indicator */}
                     <ErrorIndicator errors={errors} onSelect={setSelected} />
                     {/* View switcher - icons only on mobile */}

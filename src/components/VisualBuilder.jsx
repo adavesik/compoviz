@@ -15,8 +15,9 @@ import { edgeTypes } from './edges';
 import BuilderToolbar from './BuilderToolbar';
 import NodeConfigPanel from './NodeConfigPanel';
 import { stateToFlow, handleEdgeConnect, handleEdgeDelete, parseNodeId } from '../utils/flowConverter';
-import { Download } from 'lucide-react';
+import { Download, Lightbulb, LightbulbOff } from 'lucide-react';
 import { useCompose } from '../hooks/useCompose.jsx';
+import { useUI } from '../context/UIContext.jsx';
 
 /**
  * Visual Builder component using React Flow for interactive compose creation.
@@ -25,7 +26,8 @@ import { useCompose } from '../hooks/useCompose.jsx';
  */
 export default function VisualBuilder() {
     // Get compose state from context
-    const { state, dispatch } = useCompose();
+    const { state, dispatch, suggestions = [] } = useCompose();
+    const { suggestionsEnabled, setSuggestionsEnabled } = useUI();
     const reactFlowWrapper = useRef(null);
     const [reactFlowInstance, setReactFlowInstance] = useState(null);
     const [selectedNode, setSelectedNode] = useState(null);
@@ -45,8 +47,8 @@ export default function VisualBuilder() {
 
     // Convert compose state to React Flow format
     const { nodes: initialNodes, edges: initialEdges } = useMemo(
-        () => stateToFlow(state),
-        [state]
+        () => stateToFlow(state, suggestionsEnabled ? suggestions : []),
+        [state, suggestions, suggestionsEnabled]
     );
 
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -54,7 +56,7 @@ export default function VisualBuilder() {
 
     // Sync nodes when state changes externally
     React.useEffect(() => {
-        const { nodes: newNodes, edges: newEdges } = stateToFlow(state);
+        const { nodes: newNodes, edges: newEdges } = stateToFlow(state, suggestionsEnabled ? suggestions : []);
 
         setNodes((prevNodes) => {
             if (shouldUpdateNodes(prevNodes, newNodes)) return newNodes;
@@ -65,7 +67,7 @@ export default function VisualBuilder() {
             if (shouldUpdateEdges(prevEdges, newEdges)) return newEdges;
             return prevEdges;
         });
-    }, [state, setNodes, setEdges]);
+    }, [state, suggestions, suggestionsEnabled, setNodes, setEdges]);
 
     // Handle new edge connections
     const onConnect = useCallback(
@@ -391,6 +393,13 @@ export default function VisualBuilder() {
                     <Panel position="top-right">
                         <div className="builder-actions">
                             <button
+                                onClick={() => setSuggestionsEnabled(!suggestionsEnabled)}
+                                className={`builder-action-btn ${suggestions.length > 0 ? 'has-suggestions' : ''}`}
+                                title={suggestionsEnabled ? `${suggestions.length} suggestions (click to hide)` : `${suggestions.length} suggestions (click to show)`}
+                            >
+                                {suggestions.length > 0 ? <Lightbulb size={16} /> : <LightbulbOff size={16} />}
+                            </button>
+                            <button
                                 onClick={handleExportSvg}
                                 className="builder-action-btn"
                                 title="Export Diagram"
@@ -445,6 +454,8 @@ export default function VisualBuilder() {
                     allVolumes={state.volumes || {}}
                     allSecrets={state.secrets || {}}
                     allConfigs={state.configs || {}}
+                    suggestions={suggestions.filter(s => s.name === selectedNode.name)}
+                    suggestionsEnabled={suggestionsEnabled}
                     onUpdate={handleConfigUpdate}
                     onClose={() => setSelectedNode(null)}
                     onDelete={handleDelete}

@@ -1,5 +1,5 @@
 import { useState, useCallback, memo } from 'react';
-import { X, Server, Network, Database, Key, FileText, Trash2, Box } from 'lucide-react';
+import { X, Server, Network, Database, Key, FileText, Trash2, Box, AlertCircle, Info } from 'lucide-react';
 
 // Import config components
 import { ServiceConfig, NetworkConfig, VolumeConfig, SecretConfig, ConfigConfig } from '../features/visual-builder/configs';
@@ -17,6 +17,8 @@ const NodeConfigPanel = memo(({
     allVolumes = {},
     allSecrets = {},
     allConfigs = {},
+    suggestions = [],
+    suggestionsEnabled = true,
     onUpdate,
     onClose,
     onDelete,
@@ -179,6 +181,40 @@ const NodeConfigPanel = memo(({
 
             {/* Content based on node type */}
             <div className="config-panel-content">
+                {/* Suggestions Section */}
+                {suggestionsEnabled && suggestions.length > 0 && (
+                    <div className="mb-4 p-3 rounded-lg bg-cyber-surface border border-cyber-border">
+                        <h3 className="text-sm font-semibold text-cyber-text mb-2 flex items-center gap-2">
+                            <AlertCircle size={16} className="text-cyber-warning" />
+                            Suggestions ({suggestions.length})
+                        </h3>
+                        <div className="space-y-2">
+                            {suggestions.map((suggestion, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`p-2 rounded border-l-2 text-xs ${suggestion.severity === 'critical' ? 'border-cyber-error bg-cyber-error/5' :
+                                            suggestion.severity === 'high' ? 'border-cyber-error/80 bg-cyber-error/5' :
+                                                suggestion.severity === 'medium' ? 'border-cyber-warning bg-cyber-warning/5' :
+                                                    suggestion.severity === 'low' ? 'border-cyber-accent bg-cyber-accent/5' :
+                                                        'border-cyber-text-muted bg-cyber-surface-light'
+                                        }`}
+                                >
+                                    <div className="flex items-start gap-2">
+                                        <Info size={12} className="mt-0.5 flex-shrink-0" />
+                                        <div className="flex-1">
+                                            <p className="text-cyber-text">{suggestion.message}</p>
+                                            {suggestion.category && (
+                                                <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] bg-cyber-surface text-cyber-text-muted capitalize">
+                                                    {suggestion.category.replace('-', ' ')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
                 {renderConfig()}
             </div>
         </div>

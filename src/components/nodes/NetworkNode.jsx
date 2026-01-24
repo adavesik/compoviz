@@ -7,7 +7,7 @@ import { Network } from 'lucide-react';
  * Circular styling to differentiate from services.
  */
 const NetworkNode = memo(({ data, selected }) => {
-    const { name, driver = 'bridge', external = false } = data;
+    const { name, driver = 'bridge', external = false, suggestionCount = 0, suggestionSeverity = null } = data;
 
     return (
         <div className={`builder-node network-node ${selected ? 'selected' : ''}`}>
@@ -22,9 +22,10 @@ const NetworkNode = memo(({ data, selected }) => {
             <div className="node-content">
                 <Network size={20} className="node-icon" />
                 <span className="node-title">{name}</span>
-                <span className="node-subtitle">
-                    {external ? 'external' : driver}
-                </span>
+                {suggestionCount > 0 && (
+                    <span className={`suggestion-badge severity-${suggestionSeverity}`} title={`${suggestionCount} suggestion${suggestionCount > 1 ? 's' : ''} - Click node to view details`}>{suggestionCount}</span>
+                )}
+                <span className="node-subtitle">{external ? 'external' : driver}</span>
             </div>
         </div>
     );

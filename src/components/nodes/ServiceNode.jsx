@@ -8,7 +8,16 @@ import { getServiceIcon, renderServiceIcon } from '../../utils/iconUtils.jsx';
  * Shows service name, image, ports, and status indicators.
  */
 const ServiceNode = memo(({ data, selected }) => {
-    const { name, image, ports = [], hasHealthcheck, hasEnvFile, networks = [] } = data;
+    const {
+        name,
+        image,
+        ports = [],
+        hasHealthcheck,
+        hasEnvFile,
+        networks = [],
+        suggestionCount = 0,
+        suggestionSeverity = null,
+    } = data;
 
     // Format ports for display
     const portDisplay = ports.slice(0, 2).map(p => {
@@ -35,6 +44,15 @@ const ServiceNode = memo(({ data, selected }) => {
             <div className="node-header service-header">
                 {renderServiceIcon(iconData, 'node-icon')}
                 <span className="node-title ml-1">{name}</span>
+                {/* Suggestion Badge */}
+                {suggestionCount > 0 && (
+                    <span
+                        className={`suggestion-badge severity-${suggestionSeverity}`}
+                        title={`${suggestionCount} suggestion${suggestionCount > 1 ? 's' : ''} - Click node to view details`}
+                    >
+                        {suggestionCount}
+                    </span>
+                )}
             </div>
 
             {/* Body */}

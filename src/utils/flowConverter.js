@@ -1,11 +1,13 @@
 import { normalizeDependsOn, normalizeArray } from './validation';
+import { getSuggestionCounts, getHighestSeverity } from './suggestions';
 
 /**
  * Converts compose state to React Flow nodes and edges.
  * @param {object} state - The compose state
+ * @param {Array} suggestions - List of suggestions from generateSuggestions
  * @returns {{ nodes: Array, edges: Array }}
  */
-export function stateToFlow(state) {
+export function stateToFlow(state, suggestions = []) {
     const nodes = [];
     const edges = [];
 
@@ -44,6 +46,9 @@ export function stateToFlow(state) {
             y: SERVICE_START_Y + row * SERVICE_SPACING_Y,
         };
 
+        const suggestionCounts = getSuggestionCounts(suggestions, name);
+        const suggestionSeverity = getHighestSeverity(suggestions, name);
+
         nodes.push({
             id: `service-${name}`,
             type: 'serviceNode',
@@ -56,6 +61,8 @@ export function stateToFlow(state) {
                 hasEnvFile: !!service.env_file?.length,
                 networks: normalizeArray(service.networks),
                 volumes: service.volumes || [],
+                suggestionCount: suggestionCounts.total,
+                suggestionSeverity,
             },
         });
 
@@ -109,6 +116,9 @@ export function stateToFlow(state) {
             y: NETWORK_START_Y,
         };
 
+        const suggestionCounts = getSuggestionCounts(suggestions, name);
+        const suggestionSeverity = getHighestSeverity(suggestions, name);
+
         nodes.push({
             id: `network-${name}`,
             type: 'networkNode',
@@ -117,6 +127,8 @@ export function stateToFlow(state) {
                 name,
                 driver: network.driver || 'bridge',
                 external: network.external || false,
+                suggestionCount: suggestionCounts.total,
+                suggestionSeverity,
             },
         });
         networkIndex++;
@@ -131,6 +143,9 @@ export function stateToFlow(state) {
             y: VOLUME_START_Y,
         };
 
+        const suggestionCounts = getSuggestionCounts(suggestions, name);
+        const suggestionSeverity = getHighestSeverity(suggestions, name);
+
         nodes.push({
             id: `volume-${name}`,
             type: 'volumeNode',
@@ -139,6 +154,8 @@ export function stateToFlow(state) {
                 name,
                 driver: volume.driver || 'local',
                 external: volume.external || false,
+                suggestionCount: suggestionCounts.total,
+                suggestionSeverity,
             },
         });
         volumeIndex++;

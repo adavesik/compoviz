@@ -3,8 +3,9 @@ import { createContext, useContext, useEffect, useCallback, useMemo, useState, u
 import { generateYaml, parseYaml } from '../utils/yaml';
 import { parseEnvFile, mergeEnv } from '../utils/variableInterpolator.js';
 import { validateState } from '../utils/validation';
+import { generateSuggestions } from '../utils/suggestions';
 import { useHistoryReducer } from './useHistory';
-import { initialState, composeReducer } from './composeReducer';
+import { composeReducer, initialState } from './composeReducer';
 
 // Context
 const ComposeContext = createContext(null);
@@ -40,6 +41,9 @@ export function ComposeProvider({ children }) {
         }));
         return [...stateErrors, ...parserIssues];
     }, [state, parserErrors]);
+
+    // Generate suggestions on state change
+    const suggestions = useMemo(() => generateSuggestions(state), [state]);
 
     // Load parser metadata from localStorage on mount
     useEffect(() => {
@@ -301,6 +305,7 @@ export function ComposeProvider({ children }) {
         state,
         yamlCode,
         errors,
+        suggestions,
 
         // Parser metadata
         profiles,
