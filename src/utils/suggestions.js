@@ -119,16 +119,16 @@ const analyzeService = (name, service, state) => {
         });
     }
 
-    // Rule 5: Running as root (missing user field)
-    if (!service.user && !service.privileged) {
+    // Rule 5: Running as root (missing user configuration)
+    if (!hasUserConfig(service) && !service.privileged) {
         suggestions.push({
             id: `${name}-no-user`,
             type: 'suggestion',
             category: SuggestionCategory.SECURITY,
-            severity: SuggestionSeverity.MEDIUM,
+            severity: SuggestionSeverity.HIGH,
             entity: 'service',
             name,
-            message: 'Consider running as non-root user for better security. Add "user" field (e.g., "1000:1000").',
+            message: 'No user configuration detected. Consider adding "user" field or PUID/PGID environment variables (e.g., PUID=1000, PGID=1000).',
             action: null,
         });
     }
@@ -207,6 +207,36 @@ const analyzeService = (name, service, state) => {
         });
     }
 
+    // Rule 10: Database service with bind mounts and no user config
+    if (isDatabaseService(service) && hasBindMount(service) && !hasUserConfig(service)) {
+        suggestions.push({
+            id: `${name}-db-bindmount-no-user`,
+            type: 'suggestion',
+            category: SuggestionCategory.BEST_PRACTICE,
+            severity: SuggestionSeverity.MEDIUM,
+            entity: 'service',
+            name,
+            message: 'Database/media service using bind mounts without user configuration. This commonly causes permission issues. Consider adding PUID/PGID environment variables or using named volumes.',
+            action: null,
+        });
+    }
+
+    // Rule 11: Production data paths on bind mounts
+    const bindMounts = (service.volumes || []).filter(v => isBindMount(v));
+    const prodDataMounts = bindMounts.filter(v => isProductionDataPath(v));
+    if (prodDataMounts.length > 0) {
+        suggestions.push({
+            id: `${name}-prod-data-bindmount`,
+            type: 'suggestion',
+            category: SuggestionCategory.BEST_PRACTICE,
+            severity: SuggestionSeverity.LOW,
+            entity: 'service',
+            name,
+            message: 'Using bind mounts for production data paths. Consider named volumes for better portability, backups, and Docker-managed lifecycle.',
+            action: null,
+        });
+    }
+
     return suggestions;
 };
 
@@ -243,6 +273,72 @@ const analyzeVolume = (name, volume, state) => {
     }
 
     return suggestions;
+};
+
+/**
+ * Helper: Check if service has user configuration (user field or PUID/PGID env vars)
+ */
+const hasUserConfig = (service) => {
+    // Check for explicit user field
+    if (service.user) return true;
+
+    // Check for PUID/PGID environment variables (Linuxserver.io pattern)
+    const env = service.environment;
+    if (!env) return false;
+
+    // Convert to array of strings for checking
+    const envArray = Array.isArray(env)
+        ? env.map(e => typeof e === 'string' ? e : JSON.stringify(e))
+        : Object.keys(env);
+
+    const envStr = envArray.join('|').toUpperCase();
+    return envStr.includes('PUID') || envStr.includes('PGID') ||
+        envStr.includes('UID') || envStr.includes('GID');
+};
+
+/**
+ * Helper: Check if volume mount is a bind mount (not named volume)
+ */
+const isBindMount = (volumeStr) => {
+    if (typeof volumeStr !== 'string') return false;
+    const source = volumeStr.split(':')[0];
+    // Bind mount = absolute or relative path
+    return source.startsWith('/') || source.startsWith('.') || source.startsWith('~');
+};
+
+/**
+ * Helper: Check if service is database or data-heavy service
+ */
+const isDatabaseService = (service) => {
+    const image = service.image?.toLowerCase() || '';
+    const dbPatterns = [
+        'postgres', 'mysql', 'mariadb', 'mongo', 'redis', 'elasticsearch',
+        'cassandra', 'influxdb', 'timescale', 'cockroach',
+        // Media/data services
+        'plex', 'jellyfin', 'audiobookshelf', 'calibre', 'photoprism'
+    ];
+    return dbPatterns.some(pattern => image.includes(pattern));
+};
+
+/**
+ * Helper: Check if service has any bind mounts
+ */
+const hasBindMount = (service) => {
+    const volumes = service.volumes || [];
+    return volumes.some(vol => isBindMount(vol));
+};
+
+/**
+ * Helper: Check if volume path looks like production data
+ */
+const isProductionDataPath = (volumeStr) => {
+    if (typeof volumeStr !== 'string') return false;
+    const target = volumeStr.split(':')[1] || '';
+    const prodPaths = [
+        '/var/lib/postgresql', '/var/lib/mysql', '/var/lib/mongodb',
+        '/data', '/storage', '/media', '/library'
+    ];
+    return prodPaths.some(path => target.startsWith(path));
 };
 
 /**
