@@ -15,6 +15,7 @@ import { edgeTypes } from './edges';
 import BuilderToolbar from './BuilderToolbar';
 import NodeConfigPanel from './NodeConfigPanel';
 import { stateToFlow, handleEdgeConnect, handleEdgeDelete, parseNodeId } from '../utils/flowConverter';
+import { mergeFlowElements } from '../utils/objectUtils';
 import { Download, Lightbulb, LightbulbOff } from 'lucide-react';
 import { useCompose } from '../hooks/useCompose.jsx';
 import { useUI } from '../context/UIContext.jsx';
@@ -58,15 +59,8 @@ export default function VisualBuilder() {
     React.useEffect(() => {
         const { nodes: newNodes, edges: newEdges } = stateToFlow(state, suggestionsEnabled ? suggestions : []);
 
-        setNodes((prevNodes) => {
-            if (shouldUpdateNodes(prevNodes, newNodes)) return newNodes;
-            return prevNodes;
-        });
-
-        setEdges((prevEdges) => {
-            if (shouldUpdateEdges(prevEdges, newEdges)) return newEdges;
-            return prevEdges;
-        });
+        setNodes((prevNodes) => mergeFlowElements(prevNodes, newNodes));
+        setEdges((prevEdges) => mergeFlowElements(prevEdges, newEdges));
     }, [state, suggestions, suggestionsEnabled, setNodes, setEdges]);
 
     // Handle new edge connections
@@ -464,50 +458,4 @@ export default function VisualBuilder() {
             )}
         </div>
     );
-}
-
-function shouldUpdateNodes(prevNodes, newNodes) {
-    if (prevNodes.length !== newNodes.length) return true;
-
-    for (let i = 0; i < newNodes.length; i++) {
-        const newNode = newNodes[i];
-        const prevNode = prevNodes[i];
-
-        if (!prevNode) return true;
-        if (newNode.id !== prevNode.id) return true;
-        if (newNode.type !== prevNode.type) return true;
-        if (newNode.position.x !== prevNode.position.x) return true;
-        if (newNode.position.y !== prevNode.position.y) return true;
-        if (newNode.className !== prevNode.className) return true;
-        if (newNode.style !== prevNode.style) return true;
-        if (newNode.hidden !== prevNode.hidden) return true;
-        if (newNode.draggable !== prevNode.draggable) return true;
-        if (newNode.connectable !== prevNode.connectable) return true;
-        if (newNode.zIndex !== prevNode.zIndex) return true;
-        if (JSON.stringify(newNode.data) !== JSON.stringify(prevNode.data)) return true;
-    }
-
-    return false;
-}
-
-function shouldUpdateEdges(prevEdges, newEdges) {
-    if (prevEdges.length !== newEdges.length) return true;
-
-    for (let i = 0; i < newEdges.length; i++) {
-        const newEdge = newEdges[i];
-        const prevEdge = prevEdges[i];
-
-        if (!prevEdge) return true;
-        if (newEdge.id !== prevEdge.id) return true;
-        if (newEdge.source !== prevEdge.source) return true;
-        if (newEdge.target !== prevEdge.target) return true;
-        if (newEdge.type !== prevEdge.type) return true;
-        if (newEdge.label !== prevEdge.label) return true;
-        if (newEdge.animated !== prevEdge.animated) return true;
-        if (newEdge.style !== prevEdge.style) return true;
-        if (newEdge.markerEnd !== prevEdge.markerEnd) return true;
-        if (JSON.stringify(newEdge.data) !== JSON.stringify(prevEdge.data)) return true;
-    }
-
-    return false;
 }
