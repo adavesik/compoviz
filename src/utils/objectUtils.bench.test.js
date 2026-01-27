@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deepEqual, mergeFlowElements } from './objectUtils';
+import { mergeFlowElements } from './objectUtils';
 
 /**
  * Benchmark test comparing old position-based comparison with new ID-based merging.
