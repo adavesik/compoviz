@@ -1,11 +1,11 @@
 import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
-import { Heart, FileText, Globe } from 'lucide-react';
+import { Heart, FileText, Globe, RotateCcw } from 'lucide-react';
 import { getServiceIcon, renderServiceIcon } from '../../utils/iconUtils.jsx';
 
 /**
- * Custom node for Docker services in the visual builder.
- * Shows service name, image, ports, and status indicators.
+ * Service node — shows image, ports, restart policy, health, network count.
+ * Handles hidden at rest, visible on hover.
  */
 const ServiceNode = memo(({ data, selected }) => {
     const {
@@ -15,11 +15,12 @@ const ServiceNode = memo(({ data, selected }) => {
         hasHealthcheck,
         hasEnvFile,
         networks = [],
+        restart,
+        container_name,
         suggestionCount = 0,
         suggestionSeverity = null,
     } = data;
 
-    // Format ports for display
     const portDisplay = ports.slice(0, 2).map(p => {
         if (typeof p === 'string') {
             const parts = p.split(':');
@@ -31,24 +32,17 @@ const ServiceNode = memo(({ data, selected }) => {
     const iconData = getServiceIcon(name, image);
 
     return (
-        <div className={`builder-node service-node ${selected ? 'selected' : ''}`}>
-            {/* Target handle (top) - for incoming dependencies */}
-            <Handle
-                type="target"
-                position={Position.Top}
-                className="builder-handle"
-                id="deps-in"
-            />
+        <div className={`builder-node service-node node-animate ${selected ? 'selected' : ''}`}>
+            <Handle type="target" position={Position.Top} className="builder-handle node-handle-hidden" id="deps-in" />
 
             {/* Header */}
             <div className="node-header service-header">
                 {renderServiceIcon(iconData, 'node-icon')}
                 <span className="node-title ml-1">{name}</span>
-                {/* Suggestion Badge */}
                 {suggestionCount > 0 && (
                     <span
                         className={`suggestion-badge severity-${suggestionSeverity}`}
-                        title={`${suggestionCount} suggestion${suggestionCount > 1 ? 's' : ''} - Click node to view details`}
+                        title={`${suggestionCount} suggestion${suggestionCount > 1 ? 's' : ''}`}
                     >
                         {suggestionCount}
                     </span>
@@ -64,6 +58,13 @@ const ServiceNode = memo(({ data, selected }) => {
                     </div>
                 )}
 
+                {container_name && (
+                    <div className="node-field">
+                        <span className="field-label">name</span>
+                        <span className="field-value">{container_name}</span>
+                    </div>
+                )}
+
                 {portDisplay && (
                     <div className="node-field">
                         <span className="field-label">ports</span>
@@ -73,40 +74,32 @@ const ServiceNode = memo(({ data, selected }) => {
 
                 {/* Status indicators */}
                 <div className="node-indicators">
+                    {restart && restart !== 'no' && (
+                        <span className="indicator" title={`Restart: ${restart}`}>
+                            <RotateCcw size={11} />
+                        </span>
+                    )}
                     {hasHealthcheck && (
-                        <span className="indicator" title="Has healthcheck">
-                            <Heart size={12} />
+                        <span className="indicator indicator-active" title="Has healthcheck">
+                            <Heart size={11} />
                         </span>
                     )}
                     {hasEnvFile && (
                         <span className="indicator" title="Has env file">
-                            <FileText size={12} />
+                            <FileText size={11} />
                         </span>
                     )}
                     {networks.length > 0 && (
                         <span className="indicator" title={`Networks: ${networks.join(', ')}`}>
-                            <Globe size={12} />
+                            <Globe size={11} />
                             <span className="indicator-count">{networks.length}</span>
                         </span>
                     )}
                 </div>
             </div>
 
-            {/* Source handle (bottom) - for outgoing dependencies */}
-            <Handle
-                type="source"
-                position={Position.Bottom}
-                className="builder-handle"
-                id="deps-out"
-            />
-
-            {/* Side handles for networks/volumes */}
-            <Handle
-                type="source"
-                position={Position.Right}
-                className="builder-handle handle-right"
-                id="resources"
-            />
+            <Handle type="source" position={Position.Bottom} className="builder-handle node-handle-hidden" id="deps-out" />
+            <Handle type="source" position={Position.Right} className="builder-handle handle-right node-handle-hidden" id="resources" />
         </div>
     );
 });

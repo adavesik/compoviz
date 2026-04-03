@@ -34,7 +34,7 @@ const VolumeEdge = memo(({
                 path={edgePath}
                 className={`volume-edge ${selected ? 'selected' : ''}`}
                 style={{
-                    stroke: '#fbbf24',
+                    stroke: '#EAB354',
                     strokeWidth: selected ? 2.5 : 1.5,
                     strokeDasharray: '2 2',
                 }}

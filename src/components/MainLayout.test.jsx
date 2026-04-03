@@ -107,8 +107,8 @@ describe('MainLayout Component', () => {
     it('shows Editor view by default', () => {
         render(<MainLayout />);
 
-        // Editor view should show resource selection prompt
-        expect(screen.getByText(/select a resource/i)).toBeInTheDocument();
+        // Editor view should show the empty state hero
+        expect(screen.getByText(/Docker Compose, visualized/i)).toBeInTheDocument();
     });
 
     it('shows file drag and drop area in Editor view', () => {

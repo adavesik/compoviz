@@ -5,10 +5,13 @@ import { useState } from 'react';
  * @param {Function} loadFiles - Function to load files into the application state
  * @param {Function} setActiveView - Function to set the active view mode
  * @param {boolean} isMobile - Whether the app is in mobile view
+ * @param {Function} onError - Error callback (replaces alert)
  * @returns {Object} File import handlers and state
  */
-export function useFileImport(loadFiles, setActiveView, isMobile) {
+export function useFileImport(loadFiles, setActiveView, isMobile, onError) {
     const [isDragging, setIsDragging] = useState(false);
+
+    const showError = onError || ((msg) => { console.error(msg); });
 
     /**
      * Recursively collects all files from drag-and-drop operation
@@ -76,7 +79,7 @@ export function useFileImport(loadFiles, setActiveView, isMobile) {
         try {
             const result = await loadFiles(content, files);
             if (!result.success) {
-                alert('Invalid YAML: ' + (result.error || 'Unknown error'));
+                showError('Invalid YAML: ' + (result.error || 'Unknown error'));
                 return;
             }
             // On mobile, switch to diagram mode to show the imported config visualized
@@ -85,7 +88,7 @@ export function useFileImport(loadFiles, setActiveView, isMobile) {
             }
         } catch (error) {
             console.error('Import failed:', error);
-            alert('Import failed: ' + error.message);
+            showError('Import failed: ' + error.message);
         }
     };
 

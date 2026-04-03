@@ -9,9 +9,9 @@ export const NetworkEditor = ({ name, network, onUpdate }) => {
 
     return (
         <div className="space-y-4 animate-slide-in">
-            <div className="flex items-center justify-between pb-3 border-b border-cyber-border/50">
+            <div className="flex items-center justify-between pb-3 border-b border-border/50">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <NetworkIcon className="text-cyber-success" />{name}
+                    <NetworkIcon className="text-success" />{name}
                 </h2>
                 <Badge type="success">Network</Badge>
             </div>

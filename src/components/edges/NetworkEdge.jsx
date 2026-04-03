@@ -30,7 +30,7 @@ const NetworkEdge = memo(({
             path={edgePath}
             className={`network-edge ${selected ? 'selected' : ''}`}
             style={{
-                stroke: '#22d3ee',
+                stroke: '#56D4DD',
                 strokeWidth: selected ? 2.5 : 1.5,
                 strokeDasharray: '5 3',
             }}

@@ -25,11 +25,11 @@ export const ContextMenu = ({ x, y, onClose, onAdd }) => {
     }, [onClose]);
 
     const items = [
-        { key: 'services', label: 'Add Service', icon: Server, color: 'text-cyber-accent' },
-        { key: 'networks', label: 'Add Network', icon: Network, color: 'text-cyber-success' },
-        { key: 'volumes', label: 'Add Volume', icon: Database, color: 'text-cyber-warning' },
-        { key: 'secrets', label: 'Add Secret', icon: Key, color: 'text-cyber-purple' },
-        { key: 'configs', label: 'Add Config', icon: FileText, color: 'text-cyber-cyan' },
+        { key: 'services', label: 'Add Service', icon: Server, color: 'text-accent' },
+        { key: 'networks', label: 'Add Network', icon: Network, color: 'text-success' },
+        { key: 'volumes', label: 'Add Volume', icon: Database, color: 'text-warning' },
+        { key: 'secrets', label: 'Add Secret', icon: Key, color: 'text-secret' },
+        { key: 'configs', label: 'Add Config', icon: FileText, color: 'text-config' },
     ];
 
     // Adjust position to keep menu in viewport
@@ -39,21 +39,21 @@ export const ContextMenu = ({ x, y, onClose, onAdd }) => {
     return createPortal(
         <div
             ref={menuRef}
-            className="fixed z-[9999] glass rounded-xl py-2 shadow-xl animate-fade-in min-w-[180px] border border-cyber-border/50"
+            className="fixed z-[9999] glass rounded-xl py-2 shadow-xl animate-fade-in min-w-[180px] border border-border/50"
             style={{ left: adjustedX, top: adjustedY }}
         >
-            <div className="px-3 py-1.5 text-xs text-cyber-text-muted uppercase tracking-wide border-b border-cyber-border/30 mb-1">
+            <div className="px-3 py-1.5 text-xs text-text-secondary uppercase tracking-wide border-b border-border/30 mb-1">
                 Quick Add
             </div>
             {items.map(({ key, label, icon: Icon, color }) => (
                 <button
                     key={key}
                     onClick={() => { onAdd(key); onClose(); }}
-                    className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-cyber-surface-light transition-colors text-left group"
+                    className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-surface-raised transition-colors text-left group"
                 >
                     <Icon size={16} className={color} />
-                    <span className="text-sm group-hover:text-cyber-accent transition-colors">{label}</span>
-                    <Plus size={12} className="ml-auto text-cyber-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-sm group-hover:text-accent transition-colors">{label}</span>
+                    <Plus size={12} className="ml-auto text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
             ))}
         </div>,

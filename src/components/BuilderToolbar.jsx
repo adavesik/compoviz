@@ -6,10 +6,10 @@ import { Server, Network, Database, Key, FileText } from 'lucide-react';
  */
 const BuilderToolbar = memo(({ onAdd }) => {
     const items = [
-        { type: 'services', label: 'Service', icon: Server, color: 'text-cyber-accent' },
-        { type: 'networks', label: 'Network', icon: Network, color: 'text-cyber-success' },
-        { type: 'volumes', label: 'Volume', icon: Database, color: 'text-cyber-warning' },
-        { type: 'secrets', label: 'Secret', icon: Key, color: 'text-cyber-purple' },
+        { type: 'services', label: 'Service', icon: Server, color: 'text-accent' },
+        { type: 'networks', label: 'Network', icon: Network, color: 'text-success' },
+        { type: 'volumes', label: 'Volume', icon: Database, color: 'text-warning' },
+        { type: 'secrets', label: 'Secret', icon: Key, color: 'text-secret' },
         { type: 'configs', label: 'Config', icon: FileText, color: 'text-cyan-400' },
     ];
 

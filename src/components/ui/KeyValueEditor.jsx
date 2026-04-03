@@ -2,12 +2,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { IconButton } from './IconButton';
 
 /**
- * Key-Value pair editor for environment variables, labels, etc.
- * @param {string} label - Editor label
- * @param {Object} value - Object of key-value pairs
- * @param {(value: Object) => void} onChange - Change handler
- * @param {string} keyPlaceholder - Placeholder for key input
- * @param {string} valuePlaceholder - Placeholder for value input
+ * Key-Value pair editor with cleaner grid layout
  */
 export const KeyValueEditor = ({
     label,
@@ -36,33 +31,24 @@ export const KeyValueEditor = ({
     };
 
     return (
-        <div className="space-y-2">
+        <div className="field-group">
             <div className="flex items-center justify-between">
-                <label className="text-xs text-cyber-text-muted">{label}</label>
-                <button
-                    onClick={addEntry}
-                    className="text-xs text-cyber-accent hover:text-cyber-accent-hover flex items-center gap-1"
-                >
+                <label className="field-label">{label}</label>
+                <button onClick={addEntry} className="field-add-btn">
                     <Plus size={12} />Add
                 </button>
             </div>
-            {entries.map(([k, v], i) => (
-                <div key={i} className="flex gap-2 items-center">
-                    <input
-                        className="flex-1"
-                        placeholder={keyPlaceholder}
-                        value={k}
-                        onChange={e => updateKey(k, e.target.value)}
-                    />
-                    <input
-                        className="flex-1"
-                        placeholder={valuePlaceholder}
-                        value={v}
-                        onChange={e => updateValue(k, e.target.value)}
-                    />
-                    <IconButton icon={Trash2} onClick={() => removeEntry(k)} variant="danger" size="sm" />
+            {entries.length > 0 && (
+                <div className="space-y-1.5">
+                    {entries.map(([k, v], i) => (
+                        <div key={i} className="kv-row">
+                            <input className="flex-1 text-xs" placeholder={keyPlaceholder} value={k} onChange={e => updateKey(k, e.target.value)} />
+                            <input className="flex-1 text-xs" placeholder={valuePlaceholder} value={v} onChange={e => updateValue(k, e.target.value)} />
+                            <IconButton icon={Trash2} onClick={() => removeEntry(k)} variant="danger" size="sm" />
+                        </div>
+                    ))}
                 </div>
-            ))}
+            )}
         </div>
     );
 };

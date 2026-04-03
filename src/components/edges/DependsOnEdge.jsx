@@ -35,7 +35,7 @@ const DependsOnEdge = memo(({
                 path={edgePath}
                 className={`depends-on-edge ${selected ? 'selected' : ''}`}
                 style={{
-                    stroke: '#f472b6',
+                    stroke: '#E06C9A',
                     strokeWidth: selected ? 3 : 2,
                 }}
             />

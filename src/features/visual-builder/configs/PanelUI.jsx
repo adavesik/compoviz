@@ -187,7 +187,7 @@ export const Section = ({ title, icon: Icon, children, defaultOpen = false, high
                 onClick={() => setOpen(!open)}
             >
                 <div className="flex items-center gap-2">
-                    <Icon size={16} className="text-cyber-accent" />
+                    <Icon size={16} className="text-accent" />
                     <span>{title}</span>
                 </div>
                 {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}

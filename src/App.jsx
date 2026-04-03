@@ -3,6 +3,7 @@ import { Analytics } from '@vercel/analytics/react';
 // Providers
 import { ComposeProvider } from './hooks/useCompose.jsx';
 import { UIProvider } from './context/UIContext';
+import { ToastProvider } from './components/ui';
 
 // Layout
 import MainLayout from './components/MainLayout';
@@ -18,10 +19,11 @@ export default function App() {
   return (
     <UIProvider>
       <ComposeProvider>
-        <MainLayout />
+        <ToastProvider>
+          <MainLayout />
+        </ToastProvider>
         {vercelAnalyticsEnabled && <Analytics />}
       </ComposeProvider>
     </UIProvider>
   );
 }
-

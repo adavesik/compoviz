@@ -5,6 +5,7 @@ import { compareProjects, getComparisonSummary } from '../utils/comparison';
 import { renderDot, resetGraphviz } from '../utils/graphvizRenderer';
 import { generateMultiProjectGraphviz } from '../utils/graphviz';
 import { sanitizeSvg } from '../utils/sanitizeSvg';
+import { useToast } from './ui';
 
 /**
  * Diagram view for multi-project comparison
@@ -216,7 +217,7 @@ const DiagramView = memo(({ projects, conflicts }) => {
 
     if (error) {
         return (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-cyber-error">
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-error">
                 <AlertCircle size={48} className="mb-4" />
                 <h3 className="text-xl font-bold mb-2">Diagram Rendering Failed</h3>
                 <p className="max-w-md">{error}</p>
@@ -228,13 +229,13 @@ const DiagramView = memo(({ projects, conflicts }) => {
         <div ref={viewportRef} className="relative h-full">
             {/* View Controls */}
             <div className="absolute bottom-6 right-6 z-10 flex flex-col gap-2">
-                <button onClick={() => updateScale(s => Math.min(s + 0.1, 2))} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Zoom In"><ZoomIn size={20} /></button>
-                <button onClick={() => updateScale(s => Math.max(s - 0.1, 0.2))} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Zoom Out"><ZoomOut size={20} /></button>
-                <button onClick={resetView} className="p-3 glass rounded-xl text-cyber-accent hover:text-cyber-text hover:bg-cyber-accent/20 transition-all shadow-lg" title="Reset View"><RotateCcw size={20} /></button>
+                <button onClick={() => updateScale(s => Math.min(s + 0.1, 2))} className="p-3 glass rounded-xl text-accent hover:text-text hover:bg-accent/20 transition-all shadow-lg" title="Zoom In"><ZoomIn size={20} /></button>
+                <button onClick={() => updateScale(s => Math.max(s - 0.1, 0.2))} className="p-3 glass rounded-xl text-accent hover:text-text hover:bg-accent/20 transition-all shadow-lg" title="Zoom Out"><ZoomOut size={20} /></button>
+                <button onClick={resetView} className="p-3 glass rounded-xl text-accent hover:text-text hover:bg-accent/20 transition-all shadow-lg" title="Reset View"><RotateCcw size={20} /></button>
             </div>
 
             {/* Hint */}
-            <div className="absolute bottom-6 left-6 z-10 p-4 glass rounded-xl border border-cyber-border/50 text-xs text-cyber-text-muted select-none pointer-events-none shadow-lg">
+            <div className="absolute bottom-6 left-6 z-10 p-4 glass rounded-xl border border-border/50 text-xs text-text-secondary select-none pointer-events-none shadow-lg">
                 💡 Drag to pan • Scroll wheel to zoom • Use buttons for precise control
             </div>
 
@@ -273,6 +274,7 @@ function CompareView() {
 
     const fileInputRef = useRef(null);
     const [isDragging, setIsDragging] = useState(false);
+    const toast = useToast();
 
     // Run comparison whenever projects change
     const comparisonResults = useMemo(() => {
@@ -294,7 +296,7 @@ function CompareView() {
 
         const canAdd = 3 - projects.length;
         if (canAdd <= 0) {
-            alert('Maximum of 3 projects allowed. Please remove a project first.');
+            toast.warning('Maximum of 3 projects allowed. Please remove a project first.');
             return;
         }
 
@@ -305,7 +307,7 @@ function CompareView() {
             reader.onload = (event) => {
                 const result = addProject(event.target?.result, file.name);
                 if (!result.success) {
-                    alert(`Failed to parse ${file.name}: ${result.error}`);
+                    toast.error(`Failed to parse ${file.name}: ${result.error}`);
                 }
             };
             reader.readAsText(file);
@@ -319,7 +321,7 @@ function CompareView() {
             reader.onload = (event) => {
                 const result = addProject(event.target?.result, file.name);
                 if (!result.success) {
-                    alert(`Failed to parse ${file.name}: ${result.error}`);
+                    toast.error(`Failed to parse ${file.name}: ${result.error}`);
                 }
             };
             reader.readAsText(file);
@@ -342,16 +344,16 @@ function CompareView() {
 
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="p-4 pb-4 bg-cyber-surface border-b border-cyber-border/50 shadow-lg z-10">
+            <div className="p-4 pb-4 bg-surface border-b border-border/50 shadow-lg z-10">
                 <div className="w-full px-6 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                             {projects.map(p => (
-                                <div key={p.id} className="group relative flex items-center gap-2 px-3 py-1.5 glass rounded-lg border border-cyber-accent/30 hover:border-cyber-accent transition-all">
+                                <div key={p.id} className="group relative flex items-center gap-2 px-3 py-1.5 glass rounded-lg border border-accent/30 hover:border-accent transition-all">
                                     <span className="text-sm font-medium truncate max-w-[120px]">{p.name}</span>
                                     <button
                                         onClick={() => removeProject(p.id)}
-                                        className="text-cyber-text-muted hover:text-cyber-error transition-colors"
+                                        className="text-text-secondary hover:text-error transition-colors"
                                     >
                                         <XCircle size={14} />
                                     </button>
@@ -360,7 +362,7 @@ function CompareView() {
                             {projects.length < 3 && (
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="p-1.5 rounded-lg border border-dashed border-cyber-accent/30 text-cyber-accent hover:bg-cyber-accent/10 transition-all flex items-center gap-2"
+                                    className="p-1.5 rounded-lg border border-dashed border-accent/30 text-accent hover:bg-accent/10 transition-all flex items-center gap-2"
                                     title="Add Project"
                                 >
                                     <Plus size={16} />
@@ -374,7 +376,7 @@ function CompareView() {
                         {projects.length > 0 && (
                             <button
                                 onClick={clearAllProjects}
-                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-cyber-text-muted hover:text-cyber-error hover:bg-cyber-error/10 transition-all"
+                                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-text-secondary hover:text-error hover:bg-error/10 transition-all"
                             >
                                 <Trash2 size={16} />
                                 Clear All
@@ -395,7 +397,7 @@ function CompareView() {
             <div className="flex-1 overflow-hidden relative">
                 {projects.length < 2 ? (
                     <div
-                        className={`h-full flex flex-col items-center justify-center p-8 transition-all ${isDragging ? 'bg-cyber-accent/5' : ''
+                        className={`h-full flex flex-col items-center justify-center p-8 transition-all ${isDragging ? 'bg-accent/5' : ''
                             }`}
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
@@ -403,15 +405,15 @@ function CompareView() {
                     >
                         <div className="max-w-lg w-full text-center space-y-6">
                             <div className="relative group mx-auto w-24 h-24 mb-6">
-                                <div className="absolute inset-0 bg-cyber-accent/20 rounded-full blur-2xl group-hover:bg-cyber-accent/40 transition-all animate-pulse" />
-                                <div className="relative flex items-center justify-center w-full h-full glass rounded-full border border-cyber-accent/30 group-hover:border-cyber-accent transition-all">
-                                    <Upload size={40} className="text-cyber-accent" />
+                                <div className="absolute inset-0 bg-accent/20 rounded-full blur-2xl group-hover:bg-accent/40 transition-all animate-pulse" />
+                                <div className="relative flex items-center justify-center w-full h-full glass rounded-full border border-accent/30 group-hover:border-accent transition-all">
+                                    <Upload size={40} className="text-accent" />
                                 </div>
                             </div>
 
                             <div>
                                 <h1 className="text-3xl font-bold mb-3 tracking-tight">Compare Projects</h1>
-                                <p className="text-cyber-text-muted text-lg">
+                                <p className="text-text-secondary text-lg">
                                     {projects.length === 0
                                         ? "Drop up to 3 Docker Compose files here to analyze conflicts and dependencies across projects."
                                         : "Drop another compose file to start the comparison analysis."
@@ -421,21 +423,21 @@ function CompareView() {
 
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className="px-8 py-4 bg-cyber-accent text-white rounded-2xl font-bold hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-cyber-accent/20"
+                                className="px-8 py-4 bg-accent text-white rounded-2xl font-bold hover:brightness-110 active:scale-95 transition-all shadow-xl shadow-accent/20"
                             >
                                 Choose Files
                             </button>
 
                             <div className="grid grid-cols-2 gap-4 text-left">
-                                <div className="p-4 glass rounded-2xl border border-cyber-border/50">
-                                    <AlertTriangle className="text-cyber-warning mb-2" size={20} />
+                                <div className="p-4 glass rounded-2xl border border-border/50">
+                                    <AlertTriangle className="text-warning mb-2" size={20} />
                                     <h3 className="font-semibold text-sm">Conflict Detection</h3>
-                                    <p className="text-xs text-cyber-text-muted mt-1">Identifies overlapping ports, networks, and service names.</p>
+                                    <p className="text-xs text-text-secondary mt-1">Identifies overlapping ports, networks, and service names.</p>
                                 </div>
-                                <div className="p-4 glass rounded-2xl border border-cyber-border/50">
-                                    <Info className="text-cyber-accent mb-2" size={20} />
+                                <div className="p-4 glass rounded-2xl border border-border/50">
+                                    <Info className="text-accent mb-2" size={20} />
                                     <h3 className="font-semibold text-sm">Visual Mapping</h3>
-                                    <p className="text-xs text-cyber-text-muted mt-1">Generates a unified diagram of all interacting components.</p>
+                                    <p className="text-xs text-text-secondary mt-1">Generates a unified diagram of all interacting components.</p>
                                 </div>
                             </div>
                         </div>
@@ -444,7 +446,7 @@ function CompareView() {
                     <>
                         {/* Comparison Summary Overlay */}
                         <div className="absolute top-6 left-6 bottom-20 z-20 w-80 flex flex-col max-h-[calc(100%-8rem)]">
-                            <div className="glass p-5 rounded-2xl border border-cyber-border/50 shadow-2xl animate-slide-in flex flex-col overflow-hidden max-h-full">
+                            <div className="glass p-5 rounded-2xl border border-border/50 shadow-2xl animate-slide-in flex flex-col overflow-hidden max-h-full">
                                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2 flex-shrink-0">
                                     Analysis Results
                                     {conflicts.length > 0 ? (
@@ -455,14 +457,14 @@ function CompareView() {
                                 </h3>
 
                                 <div className="flex-1 min-h-0 flex flex-col space-y-4">
-                                    <p className="text-sm text-cyber-text-muted leading-relaxed">{summaryText}</p>
+                                    <p className="text-sm text-text-secondary leading-relaxed">{summaryText}</p>
 
                                     {comparisonResults.length > 0 && (
                                         <div className="space-y-2 overflow-y-auto pr-2 flex-1 min-h-0">
                                             {comparisonResults.map((res, idx) => (
-                                                <div key={idx} className={`p-3 rounded-xl border text-xs flex gap-3 ${res.severity === 'error' ? 'bg-cyber-error/10 border-cyber-error/30 text-cyber-error' :
-                                                    res.severity === 'warning' ? 'bg-cyber-warning/10 border-cyber-warning/30 text-cyber-warning' :
-                                                        'bg-cyber-accent/10 border-cyber-accent/30 text-cyber-accent'
+                                                <div key={idx} className={`p-3 rounded-xl border text-xs flex gap-3 ${res.severity === 'error' ? 'bg-error/10 border-error/30 text-error' :
+                                                    res.severity === 'warning' ? 'bg-warning/10 border-warning/30 text-warning' :
+                                                        'bg-accent/10 border-accent/30 text-accent'
                                                     }`}>
                                                     {res.severity === 'error' ? <XCircle size={14} className="shrink-0 mt-0.5" /> :
                                                         res.severity === 'warning' ? <AlertTriangle size={14} className="shrink-0 mt-0.5" /> :
@@ -492,7 +494,7 @@ function CompareView() {
 
 // Helper badge component for summary
 const Badge = memo(({ children, type }) => (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${type === 'error' ? 'bg-cyber-error text-white' : 'bg-cyber-success text-white'
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${type === 'error' ? 'bg-error text-white' : 'bg-success text-white'
         }`}>
         {children}
     </span>
