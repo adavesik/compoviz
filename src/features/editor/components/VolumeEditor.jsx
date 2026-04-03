@@ -9,9 +9,9 @@ export const VolumeEditor = ({ name, volume, onUpdate }) => {
 
     return (
         <div className="space-y-4 animate-slide-in">
-            <div className="flex items-center justify-between pb-3 border-b border-cyber-border/50">
+            <div className="flex items-center justify-between pb-3 border-b border-border/50">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Database className="text-cyber-warning" />{name}
+                    <Database className="text-warning" />{name}
                 </h2>
                 <Badge type="warning">Volume</Badge>
             </div>

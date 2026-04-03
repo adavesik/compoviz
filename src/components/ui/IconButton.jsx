@@ -22,8 +22,8 @@ export const IconButton = ({
         disabled={disabled}
         className={`p-${size === 'sm' ? '1' : '2'} rounded-lg transition-all duration-200 ${disabled ? 'opacity-40 cursor-not-allowed' : ''
             } ${variant === 'danger'
-                ? 'hover:bg-cyber-error/20 text-cyber-text-muted hover:text-cyber-error'
-                : 'hover:bg-cyber-surface-light text-cyber-text-muted hover:text-cyber-accent'
+                ? 'hover:bg-error/20 text-text-secondary hover:text-error'
+                : 'hover:bg-surface-raised text-text-secondary hover:text-accent'
             }`}
     >
         <Icon size={size === 'sm' ? 14 : 18} />

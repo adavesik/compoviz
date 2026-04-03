@@ -141,7 +141,7 @@ export const GraphvizDiagram = memo(({ dot, onNodeClick, onAdd }) => {
     }, []);
 
     if (error) return (
-        <div className="flex items-center justify-center h-full text-cyber-error">
+        <div className="flex items-center justify-center h-full text-error">
             <AlertCircle className="mr-2" />Diagram Error: {error}
         </div>
     );
@@ -154,36 +154,36 @@ export const GraphvizDiagram = memo(({ dot, onNodeClick, onAdd }) => {
                 <IconButton icon={ZoomOut} onClick={zoomOut} title="Zoom Out" />
                 <IconButton icon={Maximize} onClick={fitToScreen} title="Fit to Screen" />
                 <IconButton icon={RotateCcw} onClick={resetView} title="Reset View" />
-                <div className="w-px bg-cyber-border/50 mx-1" />
+                <div className="w-px bg-border/50 mx-1" />
                 <IconButton icon={Download} onClick={downloadSvg} title="Download SVG" />
             </div>
 
             {/* Hint for right-click */}
-            <div className="absolute top-2 left-2 z-10 text-xs text-cyber-text-muted glass rounded-lg px-3 py-1.5">
+            <div className="absolute top-2 left-2 z-10 text-xs text-text-secondary glass rounded-lg px-3 py-1.5">
                 💡 Right-click to add resources
             </div>
 
             {/* Legend */}
             <div className="absolute bottom-4 left-4 z-10 glass rounded-xl p-4 space-y-2">
-                <div className="text-xs font-semibold text-cyber-text-muted uppercase tracking-wide mb-2">Legend</div>
+                <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">Legend</div>
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-0.5 bg-pink-400" style={{ boxShadow: '0 0 6px #f472b6' }}></div>
-                    <span className="text-sm text-cyber-text">Depends On</span>
+                    <span className="text-sm text-text">Depends On</span>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-0.5 bg-cyan-400 border-dashed" style={{ borderTop: '2px dashed #22d3ee', height: 0 }}></div>
-                    <span className="text-sm text-cyber-text">Network</span>
+                    <span className="text-sm text-text">Network</span>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-0.5" style={{ borderTop: '2px dotted #fbbf24' }}></div>
-                    <span className="text-sm text-cyber-text">Volume Mount</span>
+                    <span className="text-sm text-text">Volume Mount</span>
                 </div>
             </div>
 
             {/* Loading indicator */}
             {loading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-cyber-bg/50 z-20">
-                    <div className="text-cyber-accent animate-pulse">Loading diagram...</div>
+                <div className="absolute inset-0 flex items-center justify-center bg-bg/50 z-20">
+                    <div className="text-accent animate-pulse">Loading diagram...</div>
                 </div>
             )}
 

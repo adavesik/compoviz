@@ -6,10 +6,10 @@
 export const Badge = ({ type, children }) => (
     <span
         className={`px-2 py-0.5 text-xs rounded-full ${type === 'error'
-                ? 'bg-cyber-error/20 text-cyber-error'
+                ? 'bg-error/20 text-error'
                 : type === 'warning'
-                    ? 'bg-cyber-warning/20 text-cyber-warning'
-                    : 'bg-cyber-success/20 text-cyber-success'
+                    ? 'bg-warning/20 text-warning'
+                    : 'bg-success/20 text-success'
             }`}
     >
         {children}

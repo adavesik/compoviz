@@ -64,12 +64,12 @@ const NodeConfigPanel = memo(({
     // Get icon and color for node type
     const getNodeTypeInfo = () => {
         switch (nodeType) {
-            case 'service': return { icon: Server, color: 'text-cyber-accent', bgColor: 'bg-cyber-accent/20' };
-            case 'network': return { icon: Network, color: 'text-cyber-success', bgColor: 'bg-cyber-success/20' };
-            case 'volume': return { icon: Database, color: 'text-cyber-warning', bgColor: 'bg-cyber-warning/20' };
-            case 'secret': return { icon: Key, color: 'text-cyber-purple', bgColor: 'bg-cyber-purple/20' };
+            case 'service': return { icon: Server, color: 'text-accent', bgColor: 'bg-accent/20' };
+            case 'network': return { icon: Network, color: 'text-success', bgColor: 'bg-success/20' };
+            case 'volume': return { icon: Database, color: 'text-warning', bgColor: 'bg-warning/20' };
+            case 'secret': return { icon: Key, color: 'text-secret', bgColor: 'bg-secret/20' };
             case 'config': return { icon: FileText, color: 'text-cyan-400', bgColor: 'bg-cyan-400/20' };
-            default: return { icon: Box, color: 'text-cyber-text-muted', bgColor: 'bg-cyber-surface-light' };
+            default: return { icon: Box, color: 'text-text-secondary', bgColor: 'bg-surface-raised' };
         }
     };
 
@@ -145,25 +145,25 @@ const NodeConfigPanel = memo(({
                                 onChange={(e) => setNewName(e.target.value)}
                                 onBlur={handleRename}
                                 onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-                                className="text-lg font-semibold bg-transparent border-b border-cyber-accent focus:outline-none w-full"
+                                className="text-lg font-semibold bg-transparent border-b border-accent focus:outline-none w-full"
                                 autoFocus
                             />
                         ) : (
                             <h2
-                                className="text-lg font-semibold cursor-pointer hover:text-cyber-accent transition-colors truncate"
+                                className="text-lg font-semibold cursor-pointer hover:text-accent transition-colors truncate"
                                 onClick={() => setIsRenaming(true)}
                                 title="Click to rename"
                             >
                                 {nodeName}
                             </h2>
                         )}
-                        <p className="text-xs text-cyber-text-muted capitalize">{nodeType}</p>
+                        <p className="text-xs text-text-secondary capitalize">{nodeType}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => onDelete?.(nodeType, nodeName)}
-                        className="p-2 rounded-lg text-cyber-text-muted hover:text-cyber-error hover:bg-cyber-error/20 transition-all"
+                        className="p-2 rounded-lg text-text-secondary hover:text-error hover:bg-error/20 transition-all"
                         title="Delete"
                     >
                         <Trash2 size={16} />
@@ -171,9 +171,9 @@ const NodeConfigPanel = memo(({
                     {/* Close button - more prominent on mobile with "Done" text */}
                     <button
                         onClick={onClose}
-                        className="p-2 md:p-2 rounded-lg text-cyber-text-muted hover:text-cyber-text hover:bg-cyber-surface-light transition-all flex items-center gap-1"
+                        className="p-2 md:p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-raised transition-all flex items-center gap-1"
                     >
-                        <span className="md:hidden text-sm text-cyber-accent font-medium">Done</span>
+                        <span className="md:hidden text-sm text-accent font-medium">Done</span>
                         <X size={18} className="hidden md:block" />
                     </button>
                 </div>
@@ -183,28 +183,28 @@ const NodeConfigPanel = memo(({
             <div className="config-panel-content">
                 {/* Suggestions Section */}
                 {suggestionsEnabled && suggestions.length > 0 && (
-                    <div className="mb-4 p-3 rounded-lg bg-cyber-surface border border-cyber-border">
-                        <h3 className="text-sm font-semibold text-cyber-text mb-2 flex items-center gap-2">
-                            <AlertCircle size={16} className="text-cyber-warning" />
+                    <div className="mb-4 p-3 rounded-lg bg-surface border border-border">
+                        <h3 className="text-sm font-semibold text-text mb-2 flex items-center gap-2">
+                            <AlertCircle size={16} className="text-warning" />
                             Suggestions ({suggestions.length})
                         </h3>
                         <div className="space-y-2">
                             {suggestions.map((suggestion, idx) => (
                                 <div
                                     key={idx}
-                                    className={`p-2 rounded border-l-2 text-xs ${suggestion.severity === 'critical' ? 'border-cyber-error bg-cyber-error/5' :
-                                            suggestion.severity === 'high' ? 'border-cyber-error/80 bg-cyber-error/5' :
-                                                suggestion.severity === 'medium' ? 'border-cyber-warning bg-cyber-warning/5' :
-                                                    suggestion.severity === 'low' ? 'border-cyber-accent bg-cyber-accent/5' :
-                                                        'border-cyber-text-muted bg-cyber-surface-light'
+                                    className={`p-2 rounded border-l-2 text-xs ${suggestion.severity === 'critical' ? 'border-error bg-error/5' :
+                                            suggestion.severity === 'high' ? 'border-error/80 bg-error/5' :
+                                                suggestion.severity === 'medium' ? 'border-warning bg-warning/5' :
+                                                    suggestion.severity === 'low' ? 'border-accent bg-accent/5' :
+                                                        'border-text-secondary bg-surface-raised'
                                         }`}
                                 >
                                     <div className="flex items-start gap-2">
                                         <Info size={12} className="mt-0.5 flex-shrink-0" />
                                         <div className="flex-1">
-                                            <p className="text-cyber-text">{suggestion.message}</p>
+                                            <p className="text-text">{suggestion.message}</p>
                                             {suggestion.category && (
-                                                <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] bg-cyber-surface text-cyber-text-muted capitalize">
+                                                <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] bg-surface text-text-secondary capitalize">
                                                     {suggestion.category.replace('-', ' ')}
                                                 </span>
                                             )}

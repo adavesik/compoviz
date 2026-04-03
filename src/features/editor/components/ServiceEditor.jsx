@@ -41,8 +41,8 @@ export const ServiceEditor = ({ name, service, onUpdate, allNetworks, allService
     return (
         <div className="space-y-4 animate-slide-in">
             {/* Header with error badge */}
-            <div className="flex items-center justify-between pb-3 border-b border-cyber-border/50">
-                <h2 className="text-lg font-semibold flex items-center gap-2"><Server className="text-cyber-accent" />{name}</h2>
+            <div className="flex items-center justify-between pb-3 border-b border-border/50">
+                <h2 className="text-lg font-semibold flex items-center gap-2"><Server className="text-accent" />{name}</h2>
                 <div className="flex items-center gap-2">
                     {serviceErrors.length > 0 && (
                         <Badge type="error">{serviceErrors.length} issue{serviceErrors.length !== 1 && 's'}</Badge>
@@ -86,28 +86,28 @@ export const ServiceEditor = ({ name, service, onUpdate, allNetworks, allService
                 <ArrayEditor label="Ports" value={service.ports} onChange={v => update('ports', v)} placeholder="8080:80" error={portsError} />
                 <ArrayEditor label="Expose" value={service.expose} onChange={v => update('expose', v)} placeholder="3000" />
                 <div className="space-y-2">
-                    <label className={`text-xs ${networksError ? 'text-cyber-error flex items-center gap-1' : 'text-cyber-text-muted'}`}>
+                    <label className={`text-xs ${networksError ? 'text-error flex items-center gap-1' : 'text-text-secondary'}`}>
                         {networksError && <AlertCircle size={12} />}
                         Networks
                     </label>
                     <div className="flex flex-wrap gap-2">
                         {Object.keys(allNetworks).map(net => (
-                            <label key={net} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-surface-light/50 cursor-pointer hover:bg-cyber-surface-light">
+                            <label key={net} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-raised/50 cursor-pointer hover:bg-surface-raised">
                                 <input type="checkbox" checked={normalizeArray(service.networks).includes(net)} onChange={e => update('networks', e.target.checked ? [...normalizeArray(service.networks), net] : normalizeArray(service.networks).filter(n => n !== net))} className="rounded" />
                                 <span className="text-sm">{net}</span>
                             </label>
                         ))}
                     </div>
                     {networksError && (
-                        <div className="mt-2 p-3 rounded-lg border border-cyber-warning/40 bg-cyber-warning/10 animate-fade-in">
+                        <div className="mt-2 p-3 rounded-lg border border-warning/40 bg-warning/10 animate-fade-in">
                             <div className="flex items-start gap-2">
-                                <AlertCircle size={16} className="text-cyber-warning mt-0.5 flex-shrink-0" />
+                                <AlertCircle size={16} className="text-warning mt-0.5 flex-shrink-0" />
                                 <div className="flex-1 space-y-2 text-sm">
-                                    <p className="font-medium text-cyber-warning">{networksError.message}</p>
-                                    <p className="text-cyber-text-muted text-xs">{getErrorHelp(networksError.message).explanation}</p>
-                                    <div className="flex items-start gap-2 p-2 bg-cyber-success/10 rounded border border-cyber-success/30">
-                                        <CheckCircle size={14} className="text-cyber-success mt-0.5 flex-shrink-0" />
-                                        <p className="text-xs text-cyber-success">{getErrorHelp(networksError.message).solution}</p>
+                                    <p className="font-medium text-warning">{networksError.message}</p>
+                                    <p className="text-text-secondary text-xs">{getErrorHelp(networksError.message).explanation}</p>
+                                    <div className="flex items-start gap-2 p-2 bg-success/10 rounded border border-success/30">
+                                        <CheckCircle size={14} className="text-success mt-0.5 flex-shrink-0" />
+                                        <p className="text-xs text-success">{getErrorHelp(networksError.message).solution}</p>
                                     </div>
                                 </div>
                             </div>
@@ -127,28 +127,28 @@ export const ServiceEditor = ({ name, service, onUpdate, allNetworks, allService
 
             <Section title="Dependencies" icon={Layers} defaultOpen={!!dependsOnError}>
                 <div className="space-y-2">
-                    <label className={`text-xs ${dependsOnError ? 'text-cyber-error flex items-center gap-1' : 'text-cyber-text-muted'}`}>
+                    <label className={`text-xs ${dependsOnError ? 'text-error flex items-center gap-1' : 'text-text-secondary'}`}>
                         {dependsOnError && <AlertCircle size={12} />}
                         Depends On
                     </label>
                     <div className="flex flex-wrap gap-2">
                         {Object.keys(allServices).filter(s => s !== name).map(svc => (
-                            <label key={svc} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-surface-light/50 cursor-pointer hover:bg-cyber-surface-light">
+                            <label key={svc} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-raised/50 cursor-pointer hover:bg-surface-raised">
                                 <input type="checkbox" checked={normalizeDependsOn(service.depends_on).includes(svc)} onChange={e => update('depends_on', e.target.checked ? [...normalizeDependsOn(service.depends_on), svc] : normalizeDependsOn(service.depends_on).filter(d => d !== svc))} className="rounded" />
                                 <span className="text-sm">{svc}</span>
                             </label>
                         ))}
                     </div>
                     {dependsOnError && (
-                        <div className="mt-2 p-3 rounded-lg border border-cyber-error/40 bg-cyber-error/10 animate-fade-in">
+                        <div className="mt-2 p-3 rounded-lg border border-error/40 bg-error/10 animate-fade-in">
                             <div className="flex items-start gap-2">
-                                <AlertCircle size={16} className="text-cyber-error mt-0.5 flex-shrink-0" />
+                                <AlertCircle size={16} className="text-error mt-0.5 flex-shrink-0" />
                                 <div className="flex-1 space-y-2 text-sm">
-                                    <p className="font-medium text-cyber-error">{dependsOnError.message}</p>
-                                    <p className="text-cyber-text-muted text-xs">{getErrorHelp(dependsOnError.message).explanation}</p>
-                                    <div className="flex items-start gap-2 p-2 bg-cyber-success/10 rounded border border-cyber-success/30">
-                                        <CheckCircle size={14} className="text-cyber-success mt-0.5 flex-shrink-0" />
-                                        <p className="text-xs text-cyber-success">{getErrorHelp(dependsOnError.message).solution}</p>
+                                    <p className="font-medium text-error">{dependsOnError.message}</p>
+                                    <p className="text-text-secondary text-xs">{getErrorHelp(dependsOnError.message).explanation}</p>
+                                    <div className="flex items-start gap-2 p-2 bg-success/10 rounded border border-success/30">
+                                        <CheckCircle size={14} className="text-success mt-0.5 flex-shrink-0" />
+                                        <p className="text-xs text-success">{getErrorHelp(dependsOnError.message).solution}</p>
                                     </div>
                                 </div>
                             </div>

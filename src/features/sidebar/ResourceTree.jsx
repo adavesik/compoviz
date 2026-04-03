@@ -15,11 +15,11 @@ export const ResourceTree = ({ onSelect, onAdd, onDelete }) => {
     const { selected, searchTerm } = useUI();
 
     const categories = [
-        { key: 'services', label: 'Services', icon: Server, color: 'text-cyber-accent' },
-        { key: 'networks', label: 'Networks', icon: Network, color: 'text-cyber-success' },
-        { key: 'volumes', label: 'Volumes', icon: Database, color: 'text-cyber-warning' },
-        { key: 'secrets', label: 'Secrets', icon: Key, color: 'text-cyber-purple' },
-        { key: 'configs', label: 'Configs', icon: FileText, color: 'text-cyber-cyan' },
+        { key: 'services', label: 'Services', icon: Server, color: 'text-accent' },
+        { key: 'networks', label: 'Networks', icon: Network, color: 'text-success' },
+        { key: 'volumes', label: 'Volumes', icon: Database, color: 'text-warning' },
+        { key: 'secrets', label: 'Secrets', icon: Key, color: 'text-secret' },
+        { key: 'configs', label: 'Configs', icon: FileText, color: 'text-config' },
     ];
 
     const getErrors = (type, name) => errors.filter(e => e.entity === type.slice(0, -1) && e.name === name);
@@ -31,9 +31,9 @@ export const ResourceTree = ({ onSelect, onAdd, onDelete }) => {
         <div className="space-y-2">
             {categories.map(({ key, label, icon: Icon, color }) => (
                 <div key={key}>
-                    <div className="flex items-center justify-between px-3 py-2 text-sm font-medium text-cyber-text-muted">
+                    <div className="flex items-center justify-between px-3 py-2 text-sm font-medium text-text-secondary">
                         <span className="flex items-center gap-2"><Icon size={14} className={color} />{label}</span>
-                        <button onClick={() => onAdd(key)} className="p-1 hover:bg-cyber-surface-light rounded transition-colors">
+                        <button onClick={() => onAdd(key)} className="p-1 hover:bg-surface-raised rounded transition-colors">
                             <Plus size={14} />
                         </button>
                     </div>

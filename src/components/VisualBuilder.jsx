@@ -425,10 +425,10 @@ export default function VisualBuilder() {
                     {/* Help hint */}
                     <Panel position="bottom-right">
                         <div className="builder-legend" style={{ fontSize: '12px' }}>
-                            <p className="text-cyber-text-muted">
+                            <p className="text-text-secondary">
                                 💡 Click a node to configure
                             </p>
-                            <p className="text-cyber-text-muted">
+                            <p className="text-text-secondary">
                                 🔗 Drag between nodes to connect
                             </p>
                         </div>

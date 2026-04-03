@@ -1,9 +1,49 @@
 /**
  * Feature announcements for "What's New" modal
  * Add new announcements at the top of the array
+ *
+ * Two formats supported:
+ * - slides: array of slide objects (carousel mode)
+ * - highlights: array of highlight objects (single-screen mode)
  */
 
 export const announcements = [
+    {
+        version: '0.4.0',
+        date: '2026-04-03',
+        // Single-screen mode: no slides, just highlights
+        highlights: [
+            {
+                emoji: '🎨',
+                title: 'New Design System',
+                description: 'Warm charcoal palette with amber accents, Satoshi + Instrument Serif typography, and refined surfaces throughout.',
+            },
+            {
+                emoji: '🚀',
+                title: 'Hero Empty State',
+                description: 'A proper landing experience with "Try a Demo" that loads a live example instantly.',
+            },
+            {
+                emoji: '🔔',
+                title: 'Toast Notifications',
+                description: 'No more browser alerts. Errors and confirmations now appear as elegant, auto-dismissing toasts.',
+            },
+            {
+                emoji: '✏️',
+                title: 'Polished Editor',
+                description: 'Cleaner form fields, collapsible sections with colored accents, and a code preview with line numbers.',
+            },
+            {
+                emoji: '🧩',
+                title: 'Builder Upgrades',
+                description: 'Nodes animate in, handles appear on hover, and selected nodes glow with type-colored rings.',
+            },
+        ],
+        action: {
+            label: 'Explore',
+            type: 'dismiss',
+        },
+    },
     {
         version: '0.3.0',
         date: '2026-01-17',
@@ -77,7 +117,6 @@ export function shouldShowAnnouncement(appVersion) {
         return true;
     }
 
-    // Simple version comparison (works for semver)
     return appVersion !== lastSeenVersion;
 }
 

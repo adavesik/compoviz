@@ -2,6 +2,7 @@
 import { render } from '@testing-library/react';
 import { ComposeProvider } from '../hooks/useCompose.jsx';
 import { UIProvider } from '../context/UIContext.jsx';
+import { ToastProvider } from '../components/ui';
 
 /**
  * Custom render function that wraps components with all necessary providers
@@ -11,7 +12,9 @@ export function renderWithProviders(ui, renderOptions = {}) {
         return (
             <UIProvider>
                 <ComposeProvider>
-                    {children}
+                    <ToastProvider>
+                        {children}
+                    </ToastProvider>
                 </ComposeProvider>
             </UIProvider>
         );

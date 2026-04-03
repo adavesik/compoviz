@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getLatestAnnouncement, shouldShowAnnouncement, markAnnouncementAsSeen } from '../data/announcements';
 import './WhatsNewModal.css';
 
-const APP_VERSION = '0.3.0'; // TODO: Get from package.json
+const APP_VERSION = '0.4.0';
 
 export default function WhatsNewModal({ onAction }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -10,13 +10,11 @@ export default function WhatsNewModal({ onAction }) {
     const [dontShowAgain, setDontShowAgain] = useState(false);
     const announcement = getLatestAnnouncement();
 
+    const isHighlightMode = !!announcement.highlights;
+
     useEffect(() => {
-        // Check if we should show the modal
-        // Use requestAnimationFrame to avoid cascading renders
         if (shouldShowAnnouncement(APP_VERSION)) {
-            requestAnimationFrame(() => {
-                setIsOpen(true);
-            });
+            requestAnimationFrame(() => setIsOpen(true));
         }
     }, []);
 
@@ -27,142 +25,119 @@ export default function WhatsNewModal({ onAction }) {
         setIsOpen(false);
     }, [dontShowAgain]);
 
-    const handleNext = useCallback(() => {
-        if (currentSlide < announcement.slides.length - 1) {
-            setCurrentSlide(currentSlide + 1);
+    const handleCTA = () => {
+        if (isHighlightMode) {
+            // Single-screen: just close
+            if (announcement.action?.type === 'dismiss') {
+                markAnnouncementAsSeen(APP_VERSION);
+                setIsOpen(false);
+                return;
+            }
+            if (onAction) onAction(announcement.action);
+        } else {
+            // Slideshow: execute slide action
+            const slide = announcement.slides[currentSlide];
+            if (onAction) onAction(slide.action);
         }
-    }, [currentSlide, announcement.slides.length]);
-
-    const handlePrevious = useCallback(() => {
-        if (currentSlide > 0) {
-            setCurrentSlide(currentSlide - 1);
-        }
-    }, [currentSlide]);
-
-    const handleDotClick = (index) => {
-        setCurrentSlide(index);
-    };
-
-    const handleTryIt = () => {
-        const slide = announcement.slides[currentSlide];
-
-        // Execute the action
-        if (onAction) {
-            onAction(slide.action);
-        }
-
-        // Close modal after action
         markAnnouncementAsSeen(APP_VERSION);
         setIsOpen(false);
     };
 
-    // Handle keyboard navigation
+    const handleNext = useCallback(() => {
+        if (!isHighlightMode && currentSlide < announcement.slides.length - 1) {
+            setCurrentSlide(currentSlide + 1);
+        }
+    }, [currentSlide, announcement, isHighlightMode]);
+
+    const handlePrevious = useCallback(() => {
+        if (currentSlide > 0) setCurrentSlide(currentSlide - 1);
+    }, [currentSlide]);
+
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (!isOpen) return;
-
-            if (e.key === 'Escape') {
-                handleClose();
-            } else if (e.key === 'ArrowLeft') {
-                handlePrevious();
-            } else if (e.key === 'ArrowRight') {
-                handleNext();
-            }
+            if (e.key === 'Escape') handleClose();
+            else if (e.key === 'ArrowLeft') handlePrevious();
+            else if (e.key === 'ArrowRight') handleNext();
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, currentSlide, handleClose, handlePrevious, handleNext]);
+    }, [isOpen, handleClose, handlePrevious, handleNext]);
 
     if (!isOpen) return null;
 
-    const currentSlideData = announcement.slides[currentSlide];
-
     return (
-        <div className="whats-new-overlay" onClick={handleClose}>
-            <div className="whats-new-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="whats-new-overlay modal-backdrop" onClick={handleClose}>
+            <div className="whats-new-modal modal-content" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="whats-new-header">
-                    <h2>✨ What&apos;s New in Compoviz v{announcement.version}</h2>
-                    <button
-                        className="whats-new-close"
-                        onClick={handleClose}
-                        aria-label="Close"
-                    >
-                        ×
-                    </button>
+                    <h2 className="font-display">
+                        Compoviz <span className="whats-new-version">v{announcement.version}</span>
+                    </h2>
+                    <button className="whats-new-close" onClick={handleClose} aria-label="Close">×</button>
                 </div>
 
-                {/* Content */}
                 <div className="whats-new-content">
-                    {/* Screenshot */}
-                    <div className="whats-new-screenshot">
-                        <img
-                            key={currentSlideData.id} // Force re-render when slide changes
-                            src={currentSlideData.screenshot}
-                            alt={currentSlideData.title}
-                            onError={(e) => {
-                                // Fallback for missing screenshots
-                                e.target.style.display = 'none';
-                            }}
-                        />
-                    </div>
+                    {isHighlightMode ? (
+                        /* ── Single-screen highlight mode ── */
+                        <>
+                            <p className="whats-new-subtitle">Here&apos;s what changed</p>
+                            <div className="whats-new-highlights">
+                                {announcement.highlights.map((h, i) => (
+                                    <div key={i} className="whats-new-highlight-item" style={{ animationDelay: `${0.08 * i}s` }}>
+                                        <span className="whats-new-highlight-emoji">{h.emoji}</span>
+                                        <div>
+                                            <p className="whats-new-highlight-title">{h.title}</p>
+                                            <p className="whats-new-highlight-desc">{h.description}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    ) : (
+                        /* ── Slideshow mode (legacy) ── */
+                        <>
+                            <div className="whats-new-screenshot">
+                                <img
+                                    key={announcement.slides[currentSlide].id}
+                                    src={announcement.slides[currentSlide].screenshot}
+                                    alt={announcement.slides[currentSlide].title}
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                            </div>
+                            <div className="whats-new-info">
+                                <h3>
+                                    <span className="whats-new-emoji">{announcement.slides[currentSlide].emoji}</span>
+                                    {announcement.slides[currentSlide].title}
+                                </h3>
+                                <p>{announcement.slides[currentSlide].description}</p>
+                            </div>
+                            <div className="whats-new-navigation">
+                                <button className="whats-new-nav-btn" onClick={handlePrevious} disabled={currentSlide === 0}>← Previous</button>
+                                <button className="whats-new-cta" onClick={handleCTA}>{announcement.slides[currentSlide].action.label}</button>
+                                <button className="whats-new-nav-btn" onClick={handleNext} disabled={currentSlide === announcement.slides.length - 1}>Next →</button>
+                            </div>
+                            <div className="whats-new-dots">
+                                {announcement.slides.map((_, index) => (
+                                    <button key={index} className={`whats-new-dot ${index === currentSlide ? 'active' : ''}`}
+                                        onClick={() => setCurrentSlide(index)} aria-label={`Go to slide ${index + 1}`} />
+                                ))}
+                            </div>
+                        </>
+                    )}
 
-                    {/* Feature Info */}
-                    <div className="whats-new-info">
-                        <h3>
-                            <span className="whats-new-emoji">{currentSlideData.emoji}</span>
-                            {currentSlideData.title}
-                        </h3>
-                        <p>{currentSlideData.description}</p>
-                    </div>
+                    {/* CTA + footer */}
+                    {isHighlightMode && (
+                        <div className="whats-new-navigation">
+                            <button className="whats-new-cta" onClick={handleCTA}>
+                                {announcement.action?.label || 'Got it'}
+                            </button>
+                        </div>
+                    )}
 
-                    {/* Navigation */}
-                    <div className="whats-new-navigation">
-                        <button
-                            className="whats-new-nav-btn"
-                            onClick={handlePrevious}
-                            disabled={currentSlide === 0}
-                        >
-                            ← Previous
-                        </button>
-
-                        <button
-                            className="whats-new-cta"
-                            onClick={handleTryIt}
-                        >
-                            {currentSlideData.action.label}
-                        </button>
-
-                        <button
-                            className="whats-new-nav-btn"
-                            onClick={handleNext}
-                            disabled={currentSlide === announcement.slides.length - 1}
-                        >
-                            Next →
-                        </button>
-                    </div>
-
-                    {/* Dots */}
-                    <div className="whats-new-dots">
-                        {announcement.slides.map((_, index) => (
-                            <button
-                                key={index}
-                                className={`whats-new-dot ${index === currentSlide ? 'active' : ''}`}
-                                onClick={() => handleDotClick(index)}
-                                aria-label={`Go to slide ${index + 1}`}
-                            />
-                        ))}
-                    </div>
-
-                    {/* Don't show again */}
                     <div className="whats-new-footer">
                         <label className="whats-new-checkbox">
-                            <input
-                                type="checkbox"
-                                checked={dontShowAgain}
-                                onChange={(e) => setDontShowAgain(e.target.checked)}
-                            />
+                            <input type="checkbox" checked={dontShowAgain} onChange={(e) => setDontShowAgain(e.target.checked)} />
                             <span>Don&apos;t show this again</span>
                         </label>
                     </div>

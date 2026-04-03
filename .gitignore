@@ -30,3 +30,6 @@ fixtures/
 .tmp-*
 
 .env
+
+# AI-generated project docs
+CLAUDE.md

@@ -1,26 +1,37 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 /**
- * Collapsible section component
- * @param {string} title - Section title
- * @param {React.ComponentType} icon - Section icon
- * @param {React.ReactNode} children - Section content
- * @param {boolean} defaultOpen - Whether section is open by default
+ * Collapsible section with colored accent border
+ * @param {string} accentColor - CSS color for the left border accent (optional)
  */
-export const Section = ({ title, icon: Icon, children, defaultOpen = true }) => {
+export const Section = ({ title, icon: Icon, children, defaultOpen = true, accentColor }) => {
     const [open, setOpen] = useState(defaultOpen);
 
     return (
-        <div className="border border-cyber-border/50 rounded-lg overflow-hidden">
-            <div className="collapsible-header" onClick={() => setOpen(!open)}>
+        <div
+            className="section-card rounded-lg overflow-hidden"
+            style={open && accentColor ? { borderLeftColor: accentColor } : undefined}
+        >
+            <button
+                type="button"
+                className="section-header w-full"
+                onClick={() => setOpen(!open)}
+                aria-expanded={open}
+            >
                 <div className="flex items-center gap-2 text-sm font-medium">
-                    <Icon size={16} className="text-cyber-accent" />
+                    <Icon size={15} style={accentColor ? { color: accentColor } : undefined} className={accentColor ? '' : 'text-accent'} />
                     {title}
                 </div>
-                {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </div>
-            {open && <div className="p-4 space-y-3 animate-fade-in">{children}</div>}
+                <div className={`section-chevron ${open ? 'section-chevron-open' : ''}`}>
+                    {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </div>
+            </button>
+            {open && (
+                <div className="section-body animate-fade-in">
+                    {children}
+                </div>
+            )}
         </div>
     );
 };

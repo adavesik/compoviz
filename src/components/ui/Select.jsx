@@ -1,19 +1,17 @@
-import { AlertCircle } from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
 
 /**
- * Select dropdown component with label and tooltip
- * @param {string} label - Select label
- * @param {string} value - Selected value
- * @param {(value: string) => void} onChange - Change handler
- * @param {Array<string | {value: string, label: string}>} options - Options array
- * @param {string} placeholder - Placeholder option text
- * @param {string} tooltip - Tooltip text
+ * Select dropdown with label and tooltip
  */
 export const Select = ({ label, value, onChange, options, placeholder, tooltip }) => (
-    <div className="space-y-1">
-        <label className="text-xs text-cyber-text-muted flex items-center gap-1">
+    <div className="field-group">
+        <label className="field-label">
             {label}
-            {tooltip && <span className="tooltip" data-tooltip={tooltip}><AlertCircle size={12} /></span>}
+            {tooltip && (
+                <span className="tooltip" data-tooltip={tooltip}>
+                    <HelpCircle size={11} className="text-text-tertiary" />
+                </span>
+            )}
         </label>
         <select value={value || ''} onChange={e => onChange(e.target.value)} className="w-full">
             {placeholder && <option value="">{placeholder}</option>}
