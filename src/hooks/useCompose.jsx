@@ -7,6 +7,7 @@ import { generateSuggestions } from '../utils/suggestions';
 import { useHistoryReducer } from './useHistory';
 import { composeReducer, initialState } from './composeReducer';
 import { enrichComposeState } from '../utils/dockerfileEnricher.js';
+import { normalizeToAST } from '../models';
 
 // Context
 const ComposeContext = createContext(null);
@@ -29,6 +30,9 @@ export function ComposeProvider({ children }) {
     const [profileCounts, setProfileCounts] = useState({});
     const [sourceYaml, setSourceYaml] = useState('');
     const lastFilesRef = useRef([]);
+
+    // Derive canonical AST from state (single normalization point for all consumers)
+    const ast = useMemo(() => normalizeToAST(state), [state]);
 
     // Generate YAML and errors on state change
     const yamlCode = useMemo(() => generateYaml(state), [state]);
@@ -315,6 +319,7 @@ export function ComposeProvider({ children }) {
     const value = {
         // State
         state,
+        ast,
         yamlCode,
         errors,
         suggestions,

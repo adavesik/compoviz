@@ -1,4 +1,5 @@
-import { normalizeArray } from './validation';
+import { normalizeToAST } from '../models/normalizeToAST.js';
+import { MountTypes } from '../models/ComposeAST.js';
 
 /**
  * Represents a conflict or shared resource between projects.
@@ -54,18 +55,14 @@ export const extractHostPort = (portMapping) => {
             hostPort = parts[0];
         } else if (parts.length === 3) {
             // Format: IP:HOST:CONTAINER (IPv4)
-            // OR Format: ::1:8080:80 (IPv6 without brackets - ambiguous, treat as IPv6)
             if (parts[0] === '' && parts[1] === '') {
                 // Starts with ::, likely IPv6 like ::1:8080:80
-                // This is ambiguous format, but we'll try to parse it
                 return null; // Skip ambiguous IPv6 without brackets
             }
             ip = parts[0];
             hostPort = parts[1];
         } else if (parts.length > 3) {
-            // Likely IPv6 without brackets (e.g., ::1:8080:80 or 2001:db8::1:8080:80)
-            // This format is ambiguous and not recommended by Docker docs
-            // We'll skip it for now
+            // Likely IPv6 without brackets
             return null;
         } else {
             // Single part, just container port
@@ -83,18 +80,8 @@ export const extractHostPort = (portMapping) => {
 };
 
 /**
- * Extract volume source from a volume mapping.
- * @param {string} volumeMapping - e.g., "data:/app/data", "./src:/app/src"
- * @returns {string|null} The source (host path or volume name)
- */
-const extractVolumeSource = (volumeMapping) => {
-    if (!volumeMapping || typeof volumeMapping !== 'string') return null;
-    const parts = volumeMapping.split(':');
-    return parts[0] || null;
-};
-
-/**
  * Compare multiple projects and detect conflicts and shared resources.
+ * Normalizes each project to AST for consistent data reads.
  * @param {Array<{id: string, name: string, content: object}>} projects
  * @returns {ComparisonResult[]}
  */
@@ -102,59 +89,72 @@ export function compareProjects(projects) {
     const results = [];
     if (!projects || projects.length < 2) return results;
 
-    // Collect data from all projects
-    const portMap = new Map(); // hostPort -> [{project, service}]
+    // Normalize each project to AST
+    const projectASTs = projects.map(project => ({
+        name: project.name,
+        ast: normalizeToAST(project.content || {}),
+    }));
+
+    // Collect data from all projects using AST
+    const portMap = new Map(); // hostBinding -> [{project, service}]
     const containerNameMap = new Map(); // containerName -> [{project, service}]
     const serviceNameMap = new Map(); // serviceName -> [project]
     const volumeMap = new Map(); // volumeSource -> [{project, service}]
     const networkMap = new Map(); // networkName -> [project]
     const envFileMap = new Map(); // envFilePath -> [{project, service}]
 
-    for (const project of projects) {
-        const { name: projectName, content } = project;
-        if (!content) continue;
+    for (const { name: projectName, ast } of projectASTs) {
+        // Collect services data from AST
+        for (const service of ast.services) {
+            const serviceName = service.id;
 
-        // Collect services data
-        for (const [serviceName, service] of Object.entries(content.services || {})) {
             // Service names
             if (!serviceNameMap.has(serviceName)) serviceNameMap.set(serviceName, []);
             serviceNameMap.get(serviceName).push(projectName);
 
             // Container names
-            if (service.container_name) {
-                if (!containerNameMap.has(service.container_name)) containerNameMap.set(service.container_name, []);
-                containerNameMap.get(service.container_name).push({ project: projectName, service: serviceName });
+            if (service.containerName) {
+                if (!containerNameMap.has(service.containerName)) containerNameMap.set(service.containerName, []);
+                containerNameMap.get(service.containerName).push({ project: projectName, service: serviceName });
             }
 
-            // Ports
-            for (const port of normalizeArray(service.ports)) {
-                const hostPort = extractHostPort(port);
-                if (hostPort) {
-                    if (!portMap.has(hostPort)) portMap.set(hostPort, []);
-                    portMap.get(hostPort).push({ project: projectName, service: serviceName, mapping: port });
+            // Ports — use pre-parsed port bindings from AST
+            for (const port of service.ports) {
+                // Build binding string matching extractHostPort format for IPv6 compat
+                let binding;
+                if (port.hostIp && port.hostIp.includes(':')) {
+                    // IPv6 — wrap in brackets
+                    binding = `[${port.hostIp}]:${port.hostPort}`;
+                } else {
+                    binding = `${port.hostIp || '0.0.0.0'}:${port.hostPort}`;
+                }
+
+                if (binding && port.hostPort) {
+                    if (!portMap.has(binding)) portMap.set(binding, []);
+                    portMap.get(binding).push({ project: projectName, service: serviceName, mapping: port.raw });
                 }
             }
 
-            // Volumes
-            for (const vol of normalizeArray(service.volumes)) {
-                const source = extractVolumeSource(vol);
+            // Volumes — use pre-parsed volume mounts from AST
+            for (const vol of service.volumes) {
+                const source = vol.source;
                 if (source) {
                     if (!volumeMap.has(source)) volumeMap.set(source, []);
-                    volumeMap.get(source).push({ project: projectName, service: serviceName, mapping: vol });
+                    volumeMap.get(source).push({ project: projectName, service: serviceName, mapping: vol.raw });
                 }
             }
 
-            // Env files
-            for (const envFile of normalizeArray(service.env_file)) {
+            // Env files — pre-normalized in AST
+            for (const envFile of service.envFiles) {
                 if (!envFileMap.has(envFile)) envFileMap.set(envFile, []);
                 envFileMap.get(envFile).push({ project: projectName, service: serviceName });
             }
         }
 
-        // Collect networks
-        for (const networkName of Object.keys(content.networks || {})) {
-            if (!networkMap.has(networkName)) networkMap.set(networkName, []);
-            networkMap.get(networkName).push(projectName);
+        // Collect networks from AST
+        for (const network of ast.networks) {
+            if (!networkMap.has(network.id)) networkMap.set(network.id, []);
+            networkMap.get(network.id).push(projectName);
         }
     }
 
@@ -197,7 +197,6 @@ export function compareProjects(projects) {
         if (usages.length > 1) {
             const projectsInvolved = [...new Set(usages.map(u => u.project))];
             if (projectsInvolved.length > 1) {
-                // Host paths starting with . or / are potential conflicts
                 const isHostPath = source.startsWith('.') || source.startsWith('/');
                 results.push({
                     type: isHostPath ? 'conflict' : 'shared',

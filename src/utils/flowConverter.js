@@ -1,15 +1,19 @@
 import { normalizeDependsOn, normalizeArray } from './validation';
 import { getSuggestionCounts, getHighestSeverity } from './suggestions';
+import { normalizeToAST } from '../models/normalizeToAST.js';
+import { MountTypes } from '../models/ComposeAST.js';
 
 /**
  * Converts compose state to React Flow nodes and edges.
- * @param {object} state - The compose state
+ * Uses the canonical AST for normalized data reads, raw state for UI positions.
+ * @param {object} state - The compose state (raw, includes _position fields)
  * @param {Array} suggestions - List of suggestions from generateSuggestions
  * @returns {{ nodes: Array, edges: Array }}
  */
 export function stateToFlow(state, suggestions = []) {
     const nodes = [];
     const edges = [];
+    const ast = normalizeToAST(state);
 
     // Layout constants
     const SERVICE_START_X = 300;
@@ -34,14 +38,15 @@ export function stateToFlow(state, suggestions = []) {
     const CONFIG_START_Y = 700;
     const CONFIG_SPACING = 180;
 
-    // Services
+    // Services — read from AST, positions from raw state
     let serviceIndex = 0;
-    for (const [name, service] of Object.entries(state.services || {})) {
-        if (!service) continue;
+    for (const service of ast.services) {
+        const name = service.id;
+        const rawSvc = state.services?.[name];
         const row = Math.floor(serviceIndex / SERVICES_PER_ROW);
         const col = serviceIndex % SERVICES_PER_ROW;
 
-        const position = service._position || {
+        const position = rawSvc?._position || {
             x: SERVICE_START_X + col * SERVICE_SPACING_X,
             y: SERVICE_START_Y + row * SERVICE_SPACING_Y,
         };
@@ -56,50 +61,47 @@ export function stateToFlow(state, suggestions = []) {
             data: {
                 name,
                 image: service.image,
-                ports: service.ports || [],
-                hasHealthcheck: !!service.healthcheck?.test,
-                hasEnvFile: !!service.env_file?.length,
-                networks: normalizeArray(service.networks),
-                volumes: service.volumes || [],
+                ports: service.ports.map(p => p.raw),
+                hasHealthcheck: service.healthcheck !== null && !service.healthcheck?.disabled && service.healthcheck?.test?.length > 0,
+                hasEnvFile: service.envFiles.length > 0,
+                networks: service.networks.map(n => n.network),
+                volumes: service.volumes.map(v => v.raw),
                 suggestionCount: suggestionCounts.total,
                 suggestionSeverity,
             },
         });
 
-        // Dependency edges
-        const deps = normalizeDependsOn(service.depends_on);
-        for (const dep of deps) {
+        // Dependency edges — from AST's pre-normalized dependencies
+        for (const dep of service.dependencies) {
             edges.push({
-                id: `dep-${name}-${dep}`,
-                source: `service-${dep}`,
+                id: `dep-${name}-${dep.service}`,
+                source: `service-${dep.service}`,
                 target: `service-${name}`,
                 type: 'dependsOnEdge',
-                data: { condition: getDependsOnCondition(service.depends_on, dep) },
+                data: { condition: dep.condition },
                 animated: true,
             });
         }
 
         // Network edges
-        const networks = normalizeArray(service.networks);
-        for (const net of networks) {
+        for (const net of service.networks) {
             edges.push({
-                id: `net-${name}-${net}`,
+                id: `net-${name}-${net.network}`,
                 source: `service-${name}`,
-                target: `network-${net}`,
+                target: `network-${net.network}`,
                 type: 'networkEdge',
             });
         }
 
-        // Volume edges
-        for (const vol of service.volumes || []) {
-            const volName = extractVolumeName(vol);
-            if (volName && state.volumes?.[volName]) {
+        // Volume edges — from AST's pre-parsed volume mounts
+        for (const vol of service.volumes) {
+            if (vol.type === MountTypes.VOLUME && ast.volumeMap.has(vol.source)) {
                 edges.push({
-                    id: `vol-${name}-${volName}`,
+                    id: `vol-${name}-${vol.source}`,
                     source: `service-${name}`,
-                    target: `volume-${volName}`,
+                    target: `volume-${vol.source}`,
                     type: 'volumeEdge',
-                    data: { mountPath: extractMountPath(vol) },
+                    data: { mountPath: vol.target },
                 });
             }
         }
@@ -109,9 +111,10 @@ export function stateToFlow(state, suggestions = []) {
 
     // Networks
     let networkIndex = 0;
-    for (const [name, network] of Object.entries(state.networks || {})) {
-        if (!network) continue;
-        const position = network._position || {
+    for (const network of ast.networks) {
+        const name = network.id;
+        const rawNet = state.networks?.[name];
+        const position = rawNet?._position || {
             x: NETWORK_START_X + networkIndex * NETWORK_SPACING,
             y: NETWORK_START_Y,
         };
@@ -125,8 +128,8 @@ export function stateToFlow(state, suggestions = []) {
             position,
             data: {
                 name,
-                driver: network.driver || 'bridge',
-                external: network.external || false,
+                driver: network.driver,
+                external: network.external,
                 suggestionCount: suggestionCounts.total,
                 suggestionSeverity,
             },
@@ -136,9 +139,10 @@ export function stateToFlow(state, suggestions = []) {
 
     // Volumes
     let volumeIndex = 0;
-    for (const [name, volume] of Object.entries(state.volumes || {})) {
-        if (!volume) continue;
-        const position = volume._position || {
+    for (const volume of ast.volumes) {
+        const name = volume.id;
+        const rawVol = state.volumes?.[name];
+        const position = rawVol?._position || {
             x: VOLUME_START_X + volumeIndex * VOLUME_SPACING,
             y: VOLUME_START_Y,
         };
@@ -152,8 +156,8 @@ export function stateToFlow(state, suggestions = []) {
             position,
             data: {
                 name,
-                driver: volume.driver || 'local',
-                external: volume.external || false,
+                driver: volume.driver,
+                external: volume.external,
                 suggestionCount: suggestionCounts.total,
                 suggestionSeverity,
             },
@@ -163,9 +167,10 @@ export function stateToFlow(state, suggestions = []) {
 
     // Secrets
     let secretIndex = 0;
-    for (const [name, secret] of Object.entries(state.secrets || {})) {
-        if (!secret) continue;
-        const position = secret._position || {
+    for (const secret of ast.secrets) {
+        const name = secret.id;
+        const rawSec = state.secrets?.[name];
+        const position = rawSec?._position || {
             x: SECRET_START_X + secretIndex * SECRET_SPACING,
             y: SECRET_START_Y,
         };
@@ -177,7 +182,7 @@ export function stateToFlow(state, suggestions = []) {
             data: {
                 name,
                 file: secret.file,
-                external: secret.external || false,
+                external: secret.external,
             },
         });
         secretIndex++;
@@ -185,9 +190,10 @@ export function stateToFlow(state, suggestions = []) {
 
     // Configs
     let configIndex = 0;
-    for (const [name, config] of Object.entries(state.configs || {})) {
-        if (!config) continue;
-        const position = config._position || {
+    for (const config of ast.configs) {
+        const name = config.id;
+        const rawCfg = state.configs?.[name];
+        const position = rawCfg?._position || {
             x: CONFIG_START_X + configIndex * CONFIG_SPACING,
             y: CONFIG_START_Y,
         };
@@ -199,49 +205,13 @@ export function stateToFlow(state, suggestions = []) {
             data: {
                 name,
                 file: config.file,
-                external: config.external || false,
+                external: config.external,
             },
         });
         configIndex++;
     }
 
     return { nodes, edges };
-}
-
-/**
- * Extract depends_on condition from long syntax
- */
-function getDependsOnCondition(dependsOn, depName) {
-    if (Array.isArray(dependsOn)) return 'service_started';
-    if (typeof dependsOn === 'object' && dependsOn[depName]) {
-        return dependsOn[depName].condition || 'service_started';
-    }
-    return 'service_started';
-}
-
-/**
- * Extract volume name from mount string
- */
-function extractVolumeName(vol) {
-    if (typeof vol === 'string') {
-        const parts = vol.split(':');
-        // Named volume (not a path)
-        if (parts[0] && !parts[0].startsWith('.') && !parts[0].startsWith('/')) {
-            return parts[0];
-        }
-    }
-    return null;
-}
-
-/**
- * Extract mount path from volume string
- */
-function extractMountPath(vol) {
-    if (typeof vol === 'string') {
-        const parts = vol.split(':');
-        return parts[1] || '';
-    }
-    return '';
 }
 
 /**
