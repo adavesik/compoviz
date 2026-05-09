@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getLatestAnnouncement, shouldShowAnnouncement, markAnnouncementAsSeen } from '../data/announcements';
 import './WhatsNewModal.css';
 
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
 
 export default function WhatsNewModal({ onAction }) {
     const [isOpen, setIsOpen] = useState(false);

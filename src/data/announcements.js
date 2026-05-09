@@ -9,6 +9,36 @@
 
 export const announcements = [
     {
+        version: '0.5.0',
+        date: '2026-05-09',
+        highlights: [
+            {
+                emoji: '🧭',
+                title: 'awesome-compose Gallery',
+                description: 'Browse and visualize 40+ production-ready stacks from Docker\'s official awesome-compose repo — on-demand, no setup.',
+            },
+            {
+                emoji: '🐳',
+                title: 'Dockerfile Enrichment',
+                description: 'Services with build: now show their actual base image (FROM) and exposed ports, resolved automatically from Dockerfiles.',
+            },
+            {
+                emoji: '🔍',
+                title: 'Search & Filter',
+                description: 'Find examples fast with category filtering and full-text search across the entire awesome-compose library.',
+            },
+            {
+                emoji: '⚡',
+                title: 'Zero-Bundle Fetching',
+                description: 'Examples load on-demand from GitHub — nothing bundled, always fresh, works offline with curated fallbacks.',
+            },
+        ],
+        action: {
+            label: 'Explore Examples',
+            type: 'dismiss',
+        },
+    },
+    {
         version: '0.4.0',
         date: '2026-04-03',
         // Single-screen mode: no slides, just highlights
