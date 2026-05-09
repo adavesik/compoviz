@@ -158,5 +158,80 @@ describe('graphviz utils', () => {
             expect(dot).toContain('nginx');
             expect(dot).toContain('vol_data');
         });
+
+        it('shows _resolvedImage in label when service has no explicit image', () => {
+            const state = {
+                services: {
+                    backend: {
+                        build: './backend',
+                        _resolvedImage: 'node:18-alpine'
+                    }
+                }
+            };
+            const dot = generateGraphviz(state);
+            expect(dot).toContain('<node>');
+            expect(dot).toContain('backend');
+        });
+
+        it('shows "build" when service has neither image nor _resolvedImage', () => {
+            const state = {
+                services: {
+                    myapp: {
+                        build: './app'
+                    }
+                }
+            };
+            const dot = generateGraphviz(state);
+            expect(dot).toContain('<build>');
+        });
+
+        it('shows only image name portion from _resolvedImage (strips tag)', () => {
+            const state = {
+                services: {
+                    api: {
+                        build: './api',
+                        _resolvedImage: 'python:3.11-slim'
+                    }
+                }
+            };
+            const dot = generateGraphviz(state);
+            expect(dot).toContain('<python>');
+            // Should not contain the tag in the label
+            expect(dot).not.toMatch(/<python:3\.11-slim>/);
+        });
+
+        it('uses _resolvedImage for tier classification when image is absent', () => {
+            const state = {
+                services: {
+                    db: {
+                        build: './db',
+                        _resolvedImage: 'postgres:15'
+                    }
+                }
+            };
+            const dot = generateGraphviz(state);
+            // Postgres should be classified as persistence tier
+            expect(dot).toContain('cluster_zone_persistence');
+        });
+
+        it('uses _resolvedPorts as fallback when service has no explicit ports', () => {
+            const state = {
+                services: {
+                    app: {
+                        build: './app',
+                        _resolvedImage: 'node:18',
+                        _resolvedPorts: [
+                            { port: 3000, protocol: 'tcp' },
+                            { port: 8080, protocol: 'tcp' }
+                        ]
+                    }
+                }
+            };
+            const dot = generateGraphviz(state);
+            expect(dot).toContain('label="3000"');
+            expect(dot).toContain('label="8080"');
+            expect(dot).toContain('port_app_0');
+            expect(dot).toContain('port_app_1');
+        });
     });
 });

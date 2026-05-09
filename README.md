@@ -107,6 +107,16 @@ Visual builder with full spec compliance:
 - **Graceful Error Handling** - Detailed error messages with context and suggestions
 - **Zero Setup Required** - Works entirely in the browser, no backend needed
 
+### 🧭 **Examples Gallery — Powered by [awesome-compose](https://github.com/docker/awesome-compose)**
+
+Browse and visualize production-ready Docker Compose configurations directly from Docker's official [awesome-compose](https://github.com/docker/awesome-compose) repository — 40+ real-world stacks available on-demand:
+
+- **Full awesome-compose Access** - Browse the entire repository without leaving Compoviz. Pick any stack (Flask, Django, React, WordPress, ELK, and dozens more) and visualize it instantly
+- **On-Demand Fetching** - Compose files are loaded from GitHub when you need them — nothing bundled, always up to date
+- **Dockerfile Enrichment** - Services with `build:` directives automatically resolve their base images from Dockerfiles, so you see what's actually running (e.g., `python:3.11-slim` instead of just "build")
+- **Zero Config** - No cloning, no setup. Click an example, see the architecture
+- **Category Filtering & Search** - Find what you need fast across web, fullstack, monitoring, and more
+
 ---
 
 ## 🆕 What's New

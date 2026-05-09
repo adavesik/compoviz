@@ -112,6 +112,13 @@ export default function MainLayout() {
         }
     };
 
+    // Load example from gallery
+    const handleLoadExample = async (yaml, example) => {
+        await handleImport(yaml, [], { exampleDir: example?.id || null });
+        setActiveView('build');
+        toast.success('Example loaded — explore the architecture!');
+    };
+
     // File import handler for EmptyState
     const handleFileImport = async (e) => {
         const files = Array.from(e.target.files || []).filter((file) => (
@@ -152,6 +159,7 @@ export default function MainLayout() {
             <EmptyState
                 onImport={handleFileImport}
                 onTryDemo={handleTryDemo}
+                onLoadExample={handleLoadExample}
                 isDragging={isDragging}
                 setIsDragging={setIsDragging}
                 onDrop={handleFileDrop}

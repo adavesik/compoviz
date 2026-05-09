@@ -6,6 +6,7 @@ import { validateState } from '../utils/validation';
 import { generateSuggestions } from '../utils/suggestions';
 import { useHistoryReducer } from './useHistory';
 import { composeReducer, initialState } from './composeReducer';
+import { enrichComposeState } from '../utils/dockerfileEnricher.js';
 
 // Context
 const ComposeContext = createContext(null);
@@ -95,7 +96,7 @@ export function ComposeProvider({ children }) {
     const loadFiles = useCallback(async (content, files = [], overrides = {}) => {
         try {
             // Build fileMap from uploaded files
-            const fileMap = {};
+            const fileMap = overrides.fileMap ? { ...overrides.fileMap } : {};
             const effectiveFiles = files.length > 0 ? files : (lastFilesRef.current || []);
             const envFromFiles = {};
             if (effectiveFiles && effectiveFiles.length > 0) {
@@ -139,7 +140,18 @@ export function ComposeProvider({ children }) {
 
                 // Update state with parsed compose
                 if (result.compose) {
-                    dispatch({ type: 'SET_STATE', payload: result.compose });
+                    // Enrich compose state with Dockerfile metadata
+                    let enrichedState = result.compose;
+                    try {
+                        enrichedState = await enrichComposeState(result.compose, {
+                            fileMap,
+                            exampleDir: overrides.exampleDir || null,
+                            timeout: 5000
+                        });
+                    } catch {
+                        // Enrichment failure is non-fatal — use original state
+                    }
+                    dispatch({ type: 'SET_STATE', payload: enrichedState });
                 }
 
                 // Update parser metadata
