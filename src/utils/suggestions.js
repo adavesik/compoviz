@@ -1,4 +1,6 @@
-import { normalizeArray } from './validation';
+import { normalizeToAST } from '../models/normalizeToAST.js';
+import { getEffectiveImage, getOrphanedVolumes, hasHealthcheck, hasResourceLimits } from '../models/astQueries.js';
+import { MountTypes, DependencyConditions } from '../models/ComposeAST.js';
 
 /**
  * Suggestion categories
@@ -23,22 +25,38 @@ export const SuggestionSeverity = {
 };
 
 /**
- * Generate suggestions for a compose state
+ * Generate suggestions for a compose state.
+ * Uses the canonical AST for normalized reads, _raw for spec-compliance checks.
  * @param {object} state - The compose state
  * @returns {Array<object>} Array of suggestions
  */
 export const generateSuggestions = (state) => {
     const suggestions = [];
+    const ast = normalizeToAST(state);
 
     // Analyze each service
-    Object.entries(state.services || {}).forEach(([name, svc]) => {
-        suggestions.push(...analyzeService(name, svc, state));
-    });
+    for (const service of ast.services) {
+        suggestions.push(...analyzeService(service, ast));
+    }
 
-    // Analyze volumes
-    Object.entries(state.volumes || {}).forEach(([name, vol]) => {
-        suggestions.push(...analyzeVolume(name, vol, state));
-    });
+    // Analyze orphaned volumes
+    const orphaned = getOrphanedVolumes(ast);
+    for (const vol of orphaned) {
+        suggestions.push({
+            id: `${vol.id}-unused-volume`,
+            type: 'suggestion',
+            category: SuggestionCategory.BEST_PRACTICE,
+            severity: SuggestionSeverity.LOW,
+            entity: 'volume',
+            name: vol.id,
+            message: 'Volume is defined but not used by any service. Consider removing it.',
+            action: {
+                type: 'delete-resource',
+                entity: 'volume',
+                name: vol.id,
+            },
+        });
+    }
 
     return suggestions;
 };
@@ -46,10 +64,12 @@ export const generateSuggestions = (state) => {
 /**
  * Analyze a service and generate suggestions
  */
-const analyzeService = (name, service, state) => {
+const analyzeService = (service, ast) => {
     const suggestions = [];
+    const name = service.id;
+    const raw = service._raw || {};
 
-    // Rule 1: Missing restart policy (CRITICAL - catches Jellyfin issue)
+    // Rule 1: Missing restart policy (CRITICAL)
     if (!service.restart) {
         suggestions.push({
             id: `${name}-missing-restart`,
@@ -67,11 +87,11 @@ const analyzeService = (name, service, state) => {
         });
     }
 
-    // Rule 2: Invalid depends_on fields (catches Jellyfin compose error)
-    if (service.depends_on && typeof service.depends_on === 'object' && !Array.isArray(service.depends_on)) {
-        Object.entries(service.depends_on).forEach(([depName, depConfig]) => {
+    // Rule 2: Invalid depends_on fields (spec-compliance — must read _raw)
+    const rawDependsOn = raw.depends_on;
+    if (rawDependsOn && typeof rawDependsOn === 'object' && !Array.isArray(rawDependsOn)) {
+        Object.entries(rawDependsOn).forEach(([depName, depConfig]) => {
             if (depConfig && typeof depConfig === 'object') {
-                // Check for invalid 'restart' field
                 if ('restart' in depConfig) {
                     suggestions.push({
                         id: `${name}-invalid-depends-on-restart`,
@@ -92,7 +112,8 @@ const analyzeService = (name, service, state) => {
     }
 
     // Rule 3: Using 'latest' image tag
-    if (service.image && service.image.includes(':latest')) {
+    const effectiveImage = getEffectiveImage(service);
+    if (effectiveImage && effectiveImage.includes(':latest')) {
         suggestions.push({
             id: `${name}-latest-tag`,
             type: 'suggestion',
@@ -106,7 +127,7 @@ const analyzeService = (name, service, state) => {
     }
 
     // Rule 4: Missing health check for long-running services
-    if (!service.healthcheck && service.restart && !isOneoffService(service)) {
+    if (!hasHealthcheck(service) && service.restart && !isOneoffService(service)) {
         suggestions.push({
             id: `${name}-missing-healthcheck`,
             type: 'suggestion',
@@ -134,7 +155,7 @@ const analyzeService = (name, service, state) => {
     }
 
     // Rule 6: Privileged containers
-    if (service.privileged === true) {
+    if (service.privileged) {
         suggestions.push({
             id: `${name}-privileged`,
             type: 'suggestion',
@@ -148,7 +169,7 @@ const analyzeService = (name, service, state) => {
     }
 
     // Rule 7: Missing resource limits
-    if (!service.deploy?.resources?.limits) {
+    if (!hasResourceLimits(service)) {
         suggestions.push({
             id: `${name}-no-resource-limits`,
             type: 'suggestion',
@@ -161,54 +182,55 @@ const analyzeService = (name, service, state) => {
         });
     }
 
-    // Rule 8: Weak dependency condition
-    if (service.depends_on && typeof service.depends_on === 'object' && !Array.isArray(service.depends_on)) {
-        Object.entries(service.depends_on).forEach(([depName, depConfig]) => {
-            if (depConfig && depConfig.condition === 'service_started') {
-                const depService = state.services?.[depName];
-                if (depService && !depService.healthcheck) {
+    // Rule 8: Weak dependency condition (uses AST dependencies + checks dep service healthcheck)
+    for (const dep of service.dependencies) {
+        if (dep.condition === DependencyConditions.STARTED) {
+            const depService = ast.serviceMap.get(dep.service);
+            if (depService && !hasHealthcheck(depService)) {
+                // Only flag if the condition was explicitly set in long syntax
+                // (short syntax always defaults to service_started — don't flag those)
+                const rawDeps = raw.depends_on;
+                if (rawDeps && typeof rawDeps === 'object' && !Array.isArray(rawDeps) && rawDeps[dep.service]) {
                     suggestions.push({
-                        id: `${name}-weak-depends-condition-${depName}`,
+                        id: `${name}-weak-depends-condition-${dep.service}`,
                         type: 'suggestion',
                         category: SuggestionCategory.ARCHITECTURE,
                         severity: SuggestionSeverity.LOW,
                         entity: 'service',
                         name,
-                        message: `Using "service_started" for "${depName}" only waits for container start, not readiness. Consider adding a healthcheck and using "service_healthy".`,
+                        message: `Using "service_started" for "${dep.service}" only waits for container start, not readiness. Consider adding a healthcheck and using "service_healthy".`,
                         action: null,
                     });
                 }
             }
-        });
+        }
     }
 
-    // Rule 9: Secrets in environment variables
-    if (service.environment) {
-        const envArray = Array.isArray(service.environment)
-            ? service.environment
-            : Object.entries(service.environment).map(([k, v]) => `${k}=${v}`);
-
+    // Rule 9: Secrets in environment variables (uses AST's pre-normalized environment object)
+    if (Object.keys(service.environment).length > 0) {
         const sensitivePatterns = ['PASSWORD', 'SECRET', 'KEY', 'TOKEN', 'CREDENTIAL'];
-        envArray.forEach((envVar) => {
-            const envStr = typeof envVar === 'string' ? envVar : JSON.stringify(envVar);
-            if (sensitivePatterns.some(pattern => envStr.toUpperCase().includes(pattern))) {
-                suggestions.push({
-                    id: `${name}-secrets-in-env`,
-                    type: 'suggestion',
-                    category: SuggestionCategory.SECURITY,
-                    severity: SuggestionSeverity.MEDIUM,
-                    entity: 'service',
-                    name,
-                    message: 'Sensitive data detected in environment variables. Consider using Docker secrets instead.',
-                    action: null,
-                });
-                return;
-            }
-        });
+        const envEntries = Object.entries(service.environment).map(([k, v]) => `${k}=${v}`);
+
+        const hasSensitive = envEntries.some(envStr =>
+            sensitivePatterns.some(pattern => envStr.toUpperCase().includes(pattern))
+        );
+
+        if (hasSensitive) {
+            suggestions.push({
+                id: `${name}-secrets-in-env`,
+                type: 'suggestion',
+                category: SuggestionCategory.SECURITY,
+                severity: SuggestionSeverity.MEDIUM,
+                entity: 'service',
+                name,
+                message: 'Sensitive data detected in environment variables. Consider using Docker secrets instead.',
+                action: null,
+            });
+        }
     }
 
     // Rule 10: Database service with bind mounts and no user config
-    if (isDatabaseService(service) && hasBindMount(service) && !hasUserConfig(service)) {
+    if (isDatabaseService(service) && hasBindMountAST(service) && !hasUserConfig(service)) {
         suggestions.push({
             id: `${name}-db-bindmount-no-user`,
             type: 'suggestion',
@@ -222,9 +244,10 @@ const analyzeService = (name, service, state) => {
     }
 
     // Rule 11: Production data paths on bind mounts
-    const bindMounts = (service.volumes || []).filter(v => isBindMount(v));
-    const prodDataMounts = bindMounts.filter(v => isProductionDataPath(v));
-    if (prodDataMounts.length > 0) {
+    const prodBindMounts = service.volumes.filter(v =>
+        v.type === MountTypes.BIND && isProductionDataTarget(v.target)
+    );
+    if (prodBindMounts.length > 0) {
         suggestions.push({
             id: `${name}-prod-data-bindmount`,
             type: 'suggestion',
@@ -240,100 +263,47 @@ const analyzeService = (name, service, state) => {
     return suggestions;
 };
 
-/**
- * Analyze a volume and generate suggestions
- */
-const analyzeVolume = (name, volume, state) => {
-    const suggestions = [];
-
-    // Rule 10: Unused volumes
-    const isUsed = Object.values(state.services || {}).some(svc => {
-        const volumes = normalizeArray(svc.volumes);
-        return volumes.some(vol => {
-            const volName = typeof vol === 'string' ? vol.split(':')[0] : vol.source;
-            return volName === name;
-        });
-    });
-
-    if (!isUsed) {
-        suggestions.push({
-            id: `${name}-unused-volume`,
-            type: 'suggestion',
-            category: SuggestionCategory.BEST_PRACTICE,
-            severity: SuggestionSeverity.LOW,
-            entity: 'volume',
-            name,
-            message: 'Volume is defined but not used by any service. Consider removing it.',
-            action: {
-                type: 'delete-resource',
-                entity: 'volume',
-                name,
-            },
-        });
-    }
-
-    return suggestions;
-};
+// ─── Helpers (now operate on AST ServiceNode) ───────────────────────────────
 
 /**
- * Helper: Check if service has user configuration (user field or PUID/PGID env vars)
+ * Check if service has user configuration (user field or PUID/PGID env vars)
  */
 const hasUserConfig = (service) => {
-    // Check for explicit user field
     if (service.user) return true;
 
-    // Check for PUID/PGID environment variables (Linuxserver.io pattern)
     const env = service.environment;
-    if (!env) return false;
+    if (!env || Object.keys(env).length === 0) return false;
 
-    // Convert to array of strings for checking
-    const envArray = Array.isArray(env)
-        ? env.map(e => typeof e === 'string' ? e : JSON.stringify(e))
-        : Object.keys(env);
-
-    const envStr = envArray.join('|').toUpperCase();
+    const envStr = Object.keys(env).join('|').toUpperCase();
     return envStr.includes('PUID') || envStr.includes('PGID') ||
         envStr.includes('UID') || envStr.includes('GID');
 };
 
 /**
- * Helper: Check if volume mount is a bind mount (not named volume)
- */
-const isBindMount = (volumeStr) => {
-    if (typeof volumeStr !== 'string') return false;
-    const source = volumeStr.split(':')[0];
-    // Bind mount = absolute or relative path
-    return source.startsWith('/') || source.startsWith('.') || source.startsWith('~');
-};
-
-/**
- * Helper: Check if service is database or data-heavy service
+ * Check if service is database or data-heavy service (uses AST classification + image)
  */
 const isDatabaseService = (service) => {
-    const image = service.image?.toLowerCase() || '';
+    const image = (getEffectiveImage(service) || '').toLowerCase();
     const dbPatterns = [
         'postgres', 'mysql', 'mariadb', 'mongo', 'redis', 'elasticsearch',
         'cassandra', 'influxdb', 'timescale', 'cockroach',
-        // Media/data services
         'plex', 'jellyfin', 'audiobookshelf', 'calibre', 'photoprism'
     ];
     return dbPatterns.some(pattern => image.includes(pattern));
 };
 
 /**
- * Helper: Check if service has any bind mounts
+ * Check if service has any bind mounts (from AST volumes)
  */
-const hasBindMount = (service) => {
-    const volumes = service.volumes || [];
-    return volumes.some(vol => isBindMount(vol));
+const hasBindMountAST = (service) => {
+    return service.volumes.some(v => v.type === MountTypes.BIND);
 };
 
 /**
- * Helper: Check if volume path looks like production data
+ * Check if volume target path looks like production data
  */
-const isProductionDataPath = (volumeStr) => {
-    if (typeof volumeStr !== 'string') return false;
-    const target = volumeStr.split(':')[1] || '';
+const isProductionDataTarget = (target) => {
+    if (!target) return false;
     const prodPaths = [
         '/var/lib/postgresql', '/var/lib/mysql', '/var/lib/mongodb',
         '/data', '/storage', '/media', '/library'
@@ -342,10 +312,10 @@ const isProductionDataPath = (volumeStr) => {
 };
 
 /**
- * Helper: Check if service is a one-off/batch job
+ * Check if service is a one-off/batch job
  */
 const isOneoffService = (service) => {
-    return service.restart === 'no' || (!service.restart && service.command);
+    return service.restart === 'no' || (!service.restart && service._raw?.command);
 };
 
 /**

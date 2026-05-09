@@ -1,38 +1,20 @@
-import { normalizeArray } from './validation';
-import { getServiceEmoji } from './iconUtils.jsx';
-
-/**
- * Escape special characters for Graphviz labels
- */
-/**
- * Get the underlying value from a possibly metadata-wrapped object
- */
-const getValue = (val) => {
-    if (val && typeof val === 'object' && '_value' in val) {
-        return val._value;
-    }
-    return val;
-};
+import { normalizeToAST } from '../models/normalizeToAST.js';
+import { getEffectiveImage, getEffectivePorts, getPrimaryNetwork } from '../models/astQueries.js';
+import { MountTypes } from '../models/ComposeAST.js';
 
 /**
  * Escape special characters for Graphviz labels
  */
 export const escapeLabel = (str) => {
     if (!str) return '';
-    return String(getValue(str)) // Ensure we unwrap value first
+    return String(str)
         .replace(/\\/g, '\\\\')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/\n/g, '\\n'); // Support multiline labels
+        .replace(/\n/g, '\\n');
 };
-
-
-/**
- * Extract depends_on condition from long syntax
- */
-
 
 /**
  * Sanitize node ID for Graphviz (must be alphanumeric + underscore)
@@ -47,13 +29,13 @@ const sanitizeId = (str) => {
  */
 const COLORS = {
     // Tiers
-    ingress: { bg: '#be123c', border: '#fda4af', text: '#ffffff' },      // Rose/Red (Input)
-    routing: { bg: '#c2410c', border: '#fdba74', text: '#ffffff' },      // Orange/Warm (Proxy)
-    application: { bg: '#0369a1', border: '#7dd3fc', text: '#ffffff' },  // Blue/Cool (Logic)
-    persistence: { bg: '#15803d', border: '#86efac', text: '#ffffff' },  // Green/Stable (Data)
+    ingress: { bg: '#be123c', border: '#fda4af', text: '#ffffff' },
+    routing: { bg: '#c2410c', border: '#fdba74', text: '#ffffff' },
+    application: { bg: '#0369a1', border: '#7dd3fc', text: '#ffffff' },
+    persistence: { bg: '#15803d', border: '#86efac', text: '#ffffff' },
 
     // Components
-    network: { bg: '#0f172a', border: '#334155', text: '#94a3b8' },      // Dark Slate
+    network: { bg: '#0f172a', border: '#334155', text: '#94a3b8' },
 
     // Storage Rail
     volume: { bg: '#b45309', border: '#fbbf24', text: '#ffffff' },
@@ -66,171 +48,73 @@ const COLORS = {
 
     // Edges
     edge: {
-        network: '#64748b',   // Neutral/Dark for structure
-        data: '#f59e0b',      // Gold for storage
-        config: '#a78bfa',    // Lavender for config
-        traffic: '#f43f5e',   // Red/Pink for active traffic
+        network: '#64748b',
+        data: '#f59e0b',
+        config: '#a78bfa',
+        traffic: '#f43f5e',
     }
 };
 
 /**
- * Classify a service into a tier based on its image/name
+ * Detect if input is already a ComposeAST (has services as array with serviceMap).
  */
-const classifyServiceTier = (name, svc) => {
-    const image = (getValue(svc.image) || svc._resolvedImage || '').toLowerCase();
-    const serviceName = name.toLowerCase();
+function isAST(input) {
+    return input && Array.isArray(input.services) && input.serviceMap instanceof Map;
+}
 
-    // Database/persistence tier
-    const dbPatterns = ['postgres', 'mysql', 'mariadb', 'mongo', 'redis', 'memcached',
-        'elasticsearch', 'rabbitmq', 'kafka', 'minio', 'influx', 'consul', 'zoo'];
-    if (dbPatterns.some(p => image.includes(p) || serviceName.includes(p))) {
-        return 'persistence';
-    }
+/**
+ * Generate Graphviz DOT from compose state or AST.
+ * Accepts either raw compose state (for backward compat) or a ComposeAST.
+ */
+export const generateGraphviz = (stateOrAst) => {
+    const ast = isAST(stateOrAst) ? stateOrAst : normalizeToAST(stateOrAst);
 
-    // Routing tier
-    const routingPatterns = ['traefik', 'nginx', 'haproxy', 'caddy', 'envoy', 'kong', 'gateway'];
-    if (routingPatterns.some(p => image.includes(p) || serviceName.includes(p))) {
-        return 'routing';
-    }
-
-    // If service has ports exposed, it might be an entry point or routing
-    const ports = normalizeArray(getValue(svc.ports));
-    if (ports.length > 0) {
-        const hasCommonPorts = ports.some(portRaw => {
-            const p = getValue(portRaw);
-            const portStr = typeof p === 'string' ? p : String(p.published);
-            return ['80', '443', '8080', '8443', '4443'].includes(portStr.split(':')[0]);
-        });
-        if (hasCommonPorts) return 'routing'; // Assumption: Web ports usually imply routing/web
-    }
-
-    return 'application';
-};
-
-export const generateGraphviz = (state) => {
-    const services = state.services || {};
-    const networks = state.networks || {};
-    const volumes = state.volumes || {};
-    const secrets = state.secrets || {};
-    const configs = state.configs || {};
-
-    if (Object.keys(services).length === 0) {
+    if (ast.services.length === 0) {
         return `digraph G { bgcolor="transparent" empty [label="No services"] }`;
     }
 
-    // --- PHASE 1: CLASSIFICATION & DATA PREP ---
+    // --- PHASE 1: CLASSIFICATION & DATA PREP (all from AST) ---
 
     // 1. Classify Services into Functional Zones
     const serviceZones = new Map();
-    const serviceTiers = new Map(); // Store tier for color lookup
-    Object.entries(services).forEach(([name, svc]) => {
-        const tier = classifyServiceTier(name, svc);
-        serviceTiers.set(name, tier);
+    const serviceTiers = new Map();
+    for (const service of ast.services) {
+        const tier = service.classification.tier;
+        serviceTiers.set(service.id, tier);
 
-        // Map Tiers to Zones
-        if (tier === 'persistence') serviceZones.set(name, 'persistence');
-        else if (tier === 'routing') serviceZones.set(name, 'gateway');
-        else serviceZones.set(name, 'compute');
-    });
+        if (tier === 'persistence') serviceZones.set(service.id, 'persistence');
+        else if (tier === 'routing') serviceZones.set(service.id, 'gateway');
+        else serviceZones.set(service.id, 'compute');
+    }
 
-    // 2. Collect Ports (Ingress Zone)
+    // 2. Collect Ports (Ingress Zone) — already parsed in AST
     const allPorts = [];
-    Object.entries(services).forEach(([name, svc]) => {
-        const svcPorts = normalizeArray(getValue(svc.ports));
-
-        // Fallback to _resolvedPorts when no explicit ports
-        if (svcPorts.length === 0 && svc._resolvedPorts && svc._resolvedPorts.length > 0) {
-            svc._resolvedPorts.forEach((rp, idx) => {
-                allPorts.push({
-                    id: `port_${sanitizeId(name)}_${idx}`,
-                    label: String(rp.port),
-                    protocol: rp.protocol || 'tcp',
-                    serviceId: sanitizeId(name)
-                });
-            });
-            return;
-        }
-
-        svcPorts.forEach((portRaw, idx) => {
-            const port = getValue(portRaw);
-            let hostPort, protocol;
-            if (typeof port === 'string') {
-                // Parse string format: supports IPv4, IPv6, and all Docker Compose formats
-                let portPart;
-
-                // Handle IPv6 with square brackets: [::1]:8080:80
-                if (port.startsWith('[')) {
-                    const closeBracket = port.indexOf(']');
-                    if (closeBracket !== -1) {
-                        const remaining = port.substring(closeBracket + 1);
-                        if (remaining.startsWith(':')) {
-                            const remainingParts = remaining.substring(1).split(':');
-                            // remainingParts = ['8080', '80'] or ['8080'] or ['80']
-                            portPart = remainingParts[0];
-                        } else {
-                            portPart = port; // Fallback
-                        }
-                    } else {
-                        portPart = port; // Invalid but fallback
-                    }
-                } else {
-                    // Handle IPv4 or simple formats
-                    const parts = port.split(':');
-
-                    if (parts.length === 2) {
-                        // Format: HOST:CONTAINER
-                        portPart = parts[0];
-                    } else if (parts.length === 3) {
-                        // Format: IP:HOST:CONTAINER (IPv4)
-                        portPart = parts[1];
-                    } else if (parts.length > 3) {
-                        // Likely IPv6 without brackets (ambiguous, skip)
-                        portPart = parts[0]; // Fallback to first part
-                    } else {
-                        // Single part: just container port
-                        portPart = parts[0];
-                    }
-                }
-
-                // Extract host port and protocol
-                // Protocol suffix is in the original port string (e.g., "6060:6060/udp")
-                const protocolSplit = portPart.split('/');
-                hostPort = protocolSplit[0];
-
-                // Try to get protocol from portPart first, then from full port string
-                if (protocolSplit[1]) {
-                    protocol = protocolSplit[1];
-                } else {
-                    // Check if protocol is in the original port string
-                    const portProtocolMatch = port.match(/\/(tcp|udp|sctp)$/i);
-                    protocol = portProtocolMatch ? portProtocolMatch[1].toLowerCase() : 'tcp';
-                }
-            } else {
-                hostPort = port.published;
-                protocol = port.protocol || 'tcp';
-            }
+    for (const service of ast.services) {
+        const ports = getEffectivePorts(service);
+        ports.forEach((port, idx) => {
             allPorts.push({
-                id: `port_${sanitizeId(name)}_${idx}`,
-                label: hostPort,
-                protocol,
-                serviceId: sanitizeId(name)
+                id: `port_${sanitizeId(service.id)}_${idx}`,
+                label: String(port.hostPort),
+                protocol: port.protocol,
+                serviceId: sanitizeId(service.id),
             });
         });
-    });
+    }
 
     // 3. Collect Storage (Storage Sidecar Zone)
     const storageNodes = [];
-    // Volumes
-    Object.keys(volumes).forEach(vName => {
-        storageNodes.push({ id: `vol_${sanitizeId(vName)}`, type: 'volume', label: vName });
-    });
-    // Host Paths
+
+    // Named volumes
+    for (const vol of ast.volumes) {
+        storageNodes.push({ id: `vol_${sanitizeId(vol.id)}`, type: 'volume', label: vol.id });
+    }
+
+    // Host paths (bind mounts from services)
     const hostPaths = new Map();
-    Object.entries(services).forEach(([, svc]) => {
-        normalizeArray(getValue(svc.volumes)).forEach(volRaw => {
-            const vol = getValue(volRaw);
-            const src = typeof vol === 'string' ? vol.split(':')[0] : '';
-            if (src && (src.startsWith('.') || src.startsWith('/'))) {
+    for (const service of ast.services) {
+        for (const vol of service.volumes) {
+            if (vol.type === MountTypes.BIND && vol.source) {
+                const src = vol.source;
                 const shortPath = src.length > 20 ? '...' + src.slice(-17) : src;
                 const bsId = btoa(src).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
                 const id = `hp_${bsId.substring(0, 10)}`;
@@ -239,21 +123,25 @@ export const generateGraphviz = (state) => {
                     storageNodes.push({ id, type: 'hostPath', label: shortPath });
                 }
             }
-        });
-    });
+        }
+    }
+
     // Secrets & Configs
-    Object.keys(secrets).forEach(s => storageNodes.push({ id: `sec_${sanitizeId(s)}`, type: 'secret', label: s }));
-    Object.keys(configs).forEach(c => storageNodes.push({ id: `cfg_${sanitizeId(c)}`, type: 'config', label: c }));
+    for (const sec of ast.secrets) {
+        storageNodes.push({ id: `sec_${sanitizeId(sec.id)}`, type: 'secret', label: sec.id });
+    }
+    for (const cfg of ast.configs) {
+        storageNodes.push({ id: `cfg_${sanitizeId(cfg.id)}`, type: 'config', label: cfg.id });
+    }
 
-
-    // --- PHASE 2: DOT GENERATION (Universal Infrastructure Blueprint) ---
+    // --- PHASE 2: DOT GENERATION ---
 
     let dot = `digraph G {\n`;
     dot += `  bgcolor="transparent"\n`;
-    dot += `  rankdir=LR\n`; // Horizontal Flow (Left -> Right)
+    dot += `  rankdir=LR\n`;
     dot += `  nodesep=0.6\n`;
-    dot += `  ranksep=1.2\n`; // High separation between zones
-    dot += `  splines=ortho\n`; // Strictly Orthogonal Lines
+    dot += `  ranksep=1.2\n`;
+    dot += `  splines=ortho\n`;
     dot += `  fontname="Inter"\n`;
     dot += `  fontsize=10\n`;
     dot += `  node [fontname="Inter", fontsize=10, style="filled,rounded", shape=box, penwidth=1.5, fixedsize=false, margin="0.2,0.1"]\n`;
@@ -261,17 +149,14 @@ export const generateGraphviz = (state) => {
     dot += `  compound=true\n`;
     dot += `  newrank=true\n\n`;
 
-    // ---------------------------------------------------------
-    // ZONE TV: STORAGE SIDECAR (Far Right)
-    // Placed first in code but rank=sink forces it to far right
-    // ---------------------------------------------------------
+    // ZONE: STORAGE SIDECAR (Far Right)
     if (storageNodes.length > 0) {
         dot += `  subgraph cluster_storage_sidecar {\n`;
         dot += `    label="📦 STORAGE & CONFIG"\n`;
         dot += `    style="dashed,rounded"\n`;
         dot += `    color="#64748b"\n`;
         dot += `    fontcolor="#94a3b8"\n`;
-        dot += `    rank=sink\n`; // Enforce Far Right Position
+        dot += `    rank=sink\n`;
 
         const storageIds = [];
         storageNodes.forEach(node => {
@@ -286,11 +171,10 @@ export const generateGraphviz = (state) => {
             dot += `      label="${icon} ${escapeLabel(node.label)}"\n`;
             dot += `      shape=folder, style=filled\n`;
             dot += `      fillcolor="${color.bg}", color="${color.border}", fontcolor="${color.text}"\n`;
-            dot += `      width=1.5\n`; // Standard width for alignment
+            dot += `      width=1.5\n`;
             dot += `    ]\n`;
         });
 
-        // Vertical stacking spine for storage
         dot += `    { rank=same; ${storageIds[0]} }\n`;
         for (let i = 0; i < storageIds.length - 1; i++) {
             dot += `    ${storageIds[i]} -> ${storageIds[i + 1]} [style=invis, weight=10]\n`;
@@ -298,14 +182,12 @@ export const generateGraphviz = (state) => {
         dot += `  }\n\n`;
     }
 
-    // ---------------------------------------------------------
-    // ZONE I: INGRESS RAIL (Far Left)
-    // ---------------------------------------------------------
+    // ZONE: INGRESS RAIL (Far Left)
     if (allPorts.length > 0) {
         dot += `  subgraph cluster_ingress_zone {\n`;
         dot += `    label="⚡ ENTRY"\n`;
         dot += `    style=invis\n`;
-        dot += `    rank=source\n`; // Force Leftmost Position
+        dot += `    rank=source\n`;
 
         const portIds = [];
         allPorts.forEach(p => {
@@ -317,28 +199,24 @@ export const generateGraphviz = (state) => {
             dot += `    ]\n`;
         });
 
-        // Vertical Alignment Spine
         for (let i = 0; i < portIds.length - 1; i++) {
             dot += `    ${portIds[i]} -> ${portIds[i + 1]} [style=invis, weight=10]\n`;
         }
         dot += `  }\n\n`;
     }
 
-    // ---------------------------------------------------------
-    // NETWORK BOUNDARY (Zones II, III, IV)
-    // ---------------------------------------------------------
-
-    // Group services by primary network for visual boundaries
+    // NETWORK BOUNDARIES (Zones II, III, IV)
+    // Group services by primary network
     const servicesByNetwork = new Map();
-    Object.entries(services).forEach(([name, svc]) => {
-        const net = normalizeArray(getValue(svc.networks))[0] || '_default';
+    for (const service of ast.services) {
+        const net = getPrimaryNetwork(service);
         if (!servicesByNetwork.has(net)) servicesByNetwork.set(net, []);
-        servicesByNetwork.get(net).push({ name, svc });
-    });
-    // Ensure standalone networks still render in the diagram
-    Object.keys(networks).forEach(netName => {
-        if (!servicesByNetwork.has(netName)) servicesByNetwork.set(netName, []);
-    });
+        servicesByNetwork.get(net).push(service);
+    }
+    // Ensure standalone networks still render
+    for (const network of ast.networks) {
+        if (!servicesByNetwork.has(network.id)) servicesByNetwork.set(network.id, []);
+    }
 
     for (const [netName, netServices] of servicesByNetwork) {
         dot += `  subgraph cluster_net_${sanitizeId(netName)} {\n`;
@@ -349,55 +227,48 @@ export const generateGraphviz = (state) => {
         dot += `    fontcolor="${COLORS.network.text}"\n`;
         dot += `    margin=16\n\n`;
 
-        // Bucket services within this network by their Zone
         const gateways = [];
         const compute = [];
         const persistence = [];
 
-        netServices.forEach(({ name, svc }) => {
-            const zone = serviceZones.get(name);
-            const tier = serviceTiers.get(name);
+        for (const service of netServices) {
+            const zone = serviceZones.get(service.id);
+            const tier = serviceTiers.get(service.id);
             const color = COLORS[tier] || COLORS.application;
-            const imageStr = getValue(svc.image) || svc._resolvedImage;
-            const img = imageStr ? imageStr.split(':')[0] : 'build';
-
-            // Get service-specific icon from centralized utility
-            const icon = getServiceEmoji(name, imageStr) + ' ';
+            const effectiveImage = getEffectiveImage(service);
+            const img = effectiveImage ? effectiveImage.split(':')[0] : 'build';
+            const icon = service.classification.icon + ' ';
 
             const nodeDef = `
-                ${sanitizeId(name)} [
-                    label="${icon}${escapeLabel(name)}\\n<${escapeLabel(img)}>"
+                ${sanitizeId(service.id)} [
+                    label="${icon}${escapeLabel(service.id)}\\n<${escapeLabel(img)}>"
                     fillcolor="${color.bg}" color="${color.border}" fontcolor="${color.text}"
                 ]`;
 
             if (zone === 'gateway') gateways.push(nodeDef);
             else if (zone === 'persistence') persistence.push(nodeDef);
             else compute.push(nodeDef);
-        });
+        }
 
-        // ZONE II: GATEWAY (Left Edge of Network)
         if (gateways.length > 0) {
             dot += `    subgraph cluster_zone_gateway {\n`;
-            dot += `      label="" style=invis\n`; // Invisible grouping
-            dot += `      rank=min\n`; // Pull to left
+            dot += `      label="" style=invis\n`;
+            dot += `      rank=min\n`;
             dot += gateways.join('\n');
             dot += `    }\n`;
         }
 
-        // ZONE III: COMPUTE (Center of Network)
         if (compute.length > 0) {
             dot += `    subgraph cluster_zone_compute {\n`;
             dot += `      label="" style=invis\n`;
-            // No rank constraint (float center)
             dot += compute.join('\n');
             dot += `    }\n`;
         }
 
-        // ZONE IV: PERSISTENCE (Right Edge of Network)
         if (persistence.length > 0) {
             dot += `    subgraph cluster_zone_persistence {\n`;
             dot += `      label="" style=invis\n`;
-            dot += `      rank=max\n`; // Pull to right within subgraph
+            dot += `      rank=max\n`;
             dot += persistence.join('\n');
             dot += `    }\n`;
         }
@@ -414,121 +285,92 @@ export const generateGraphviz = (state) => {
             dot += `    ]\n`;
         }
 
-        dot += `  }\n`; // End Network
+        dot += `  }\n`;
     }
-
 
     // --- PHASE 3: SEMANTIC ROUTING ---
 
-    // 1. Ingress: Port -> Gateway/Service
+    // 1. Ingress: Port -> Service
     allPorts.forEach(p => {
         dot += `  ${p.id} -> ${p.serviceId} [\n`;
         dot += `    label="${p.protocol}"\n`;
         dot += `    color="${COLORS.edge.traffic}", fontcolor="${COLORS.edge.traffic}"\n`;
-        dot += `    penwidth=2.5\n`; // Thicker for main traffic
+        dot += `    penwidth=2.5\n`;
         dot += `  ]\n`;
     });
 
-    // 2. Data Flow: Gateway -> Compute -> Persistence
-    // We infer flow from `depends_on`.
-    // If App depends on DB, we draw arrow App -> DB (Call Flow).
-    // In LR layout, with Persistence at Right, this naturally flows Left -> Right.
-    // If Gateway depends on App... wait, normally Gateway forwards to App.
-    // We want visually: Gateway --> App --> DB.
+    // 2. Dependency edges
+    for (const service of ast.services) {
+        const srcId = sanitizeId(service.id);
 
-    // Explicitly add 'Forwarding' edges if we can infer them?
-    // Hard without knowing config. We rely on valid `depends_on` or manual links.
-    // But we CAN enforce `depends_on` styling.
+        for (const dep of service.dependencies) {
+            if (ast.serviceMap.has(dep.service)) {
+                const depId = sanitizeId(dep.service);
 
-    Object.entries(services).forEach(([name, svc]) => {
-        const srcId = sanitizeId(name);
-        // Handle both short and long syntax for depends_on
-        const dependsOn = svc.depends_on;
-        let deps = [];
-
-        if (Array.isArray(dependsOn)) {
-            // Short syntax: ["db", "redis"]
-            deps = dependsOn.map(d => ({ name: d, condition: '' }));
-        } else if (typeof dependsOn === 'object' && dependsOn !== null) {
-            // Long syntax: { db: { condition: "service_healthy" } }
-            deps = Object.entries(dependsOn).map(([d, config]) => ({
-                name: d,
-                condition: config.condition || ''
-            }));
-        }
-
-        deps.forEach(dep => {
-            if (services[dep.name]) {
-                const depId = sanitizeId(dep.name);
-                const condition = dep.condition.replace('service_', '');
-
+                // Only show condition label for non-default conditions
+                // (service_started is the default — don't clutter the diagram)
                 let label = '';
-                // Don't modify label with special characters before final assembly
-                if (condition) label = `\\n(${escapeLabel(condition)})`;
+                if (dep.condition && dep.condition !== 'service_started') {
+                    const condition = dep.condition.replace('service_', '');
+                    label = `\\n(${escapeLabel(condition)})`;
+                }
 
                 dot += `  ${srcId} -> ${depId} [\n`;
-                dot += `    label="${label}"\n`; // Use label directly as it's already formatted
+                dot += `    label="${label}"\n`;
                 dot += `    color="${COLORS.edge.network}", style=solid\n`;
                 dot += `    penwidth=1.5\n`;
                 dot += `    fontsize=8\n`;
                 dot += `    fontcolor="${COLORS.edge.network}"\n`;
                 dot += `  ]\n`;
             }
-        });
-    });
+        }
+    }
 
     // 3. Storage Sidecar Mounts
-    // Dashed lines from Service (Left) to Storage (Right).
-    // Direction: Service -> Storage.
-    // Visually: Container ----> Volume.
+    for (const service of ast.services) {
+        const svcId = sanitizeId(service.id);
 
-    Object.entries(services).forEach(([name, svc]) => {
-        const svcId = sanitizeId(name);
-
-        // Volumes/HostPaths
-        normalizeArray(getValue(svc.volumes)).forEach(volRaw => {
-            const vol = getValue(volRaw);
-            const src = typeof vol === 'string' ? vol.split(':')[0] : '';
+        // Volume/bind mounts
+        for (const vol of service.volumes) {
             let targetId = null;
-            if (src && volumes[src]) targetId = `vol_${sanitizeId(src)}`;
-            else if (src && (src.startsWith('.') || src.startsWith('/'))) {
-                const bsId = btoa(src).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+            if (vol.type === MountTypes.VOLUME && ast.volumeMap.has(vol.source)) {
+                targetId = `vol_${sanitizeId(vol.source)}`;
+            } else if (vol.type === MountTypes.BIND && vol.source) {
+                const bsId = btoa(vol.source).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
                 targetId = `hp_${bsId.substring(0, 10)}`;
             }
 
             if (targetId) {
-                // Orthogonal routing for sidecar
                 dot += `  ${svcId} -> ${targetId} [\n`;
                 dot += `    style=dashed\n`;
                 dot += `    color="${COLORS.edge.data}"\n`;
-                // constraint=false lets orthogonal router find path without breaking ranks too much
-                // BUT we want them on right.
                 dot += `  ]\n`;
             }
-        });
+        }
 
-        // Secrets/Configs
-        normalizeArray(getValue(svc.secrets)).forEach(sRaw => {
-            const s = getValue(sRaw);
-            const t = typeof s === 'string' ? s : s.source;
-            if (secrets[t]) {
-                dot += `  ${svcId} -> sec_${sanitizeId(t)} [style=dotted, color="${COLORS.edge.config}"]\n`;
+        // Secrets
+        for (const secretName of service.secrets) {
+            if (ast.secrets.some(s => s.id === secretName)) {
+                dot += `  ${svcId} -> sec_${sanitizeId(secretName)} [style=dotted, color="${COLORS.edge.config}"]\n`;
             }
-        });
-        normalizeArray(getValue(svc.configs)).forEach(cRaw => {
-            const c = getValue(cRaw);
-            const t = typeof c === 'string' ? c : c.source;
-            if (configs[t]) {
-                dot += `  ${svcId} -> cfg_${sanitizeId(t)} [style=dotted, color="${COLORS.edge.config}"]\n`;
+        }
+
+        // Configs
+        for (const configName of service.configs) {
+            if (ast.configs.some(c => c.id === configName)) {
+                dot += `  ${svcId} -> cfg_${sanitizeId(configName)} [style=dotted, color="${COLORS.edge.config}"]\n`;
             }
-        });
-    });
+        }
+    }
 
     dot += `}\n`;
     return dot;
 };
 
-// Multi-project support
+// ─── Multi-project support ──────────────────────────────────────────────────
+// Note: generateMultiProjectGraphviz still uses raw state for now.
+// It will be migrated in Task 6 (compareProjects migration).
+
 const PROJECT_COLORS = [
     { bg: '#1e3a8a', border: '#3b82f6', name: 'blue' },
     { bg: '#065f46', border: '#10b981', name: 'green' },
@@ -575,7 +417,6 @@ export const generateMultiProjectGraphviz = (projects, conflicts = []) => {
     dot += `  compound=true\n`;
     dot += `  newrank=true\n\n`;
 
-    // Render each project as a subgraph
     projects.forEach((project, idx) => {
         const content = project.content || {};
         const projectPrefix = `p${idx}_`;
@@ -588,12 +429,12 @@ export const generateMultiProjectGraphviz = (projects, conflicts = []) => {
         dot += `    fillcolor="${color.bg}20"\n`;
         dot += `    fontcolor="#f1f5f9"\n\n`;
 
-        // Services
         Object.entries(content.services || {}).forEach(([serviceName, svc]) => {
             const nodeId = `${projectPrefix}${sanitizeId(serviceName)}`;
             const img = svc.image ? svc.image.split(':')[0] : 'build';
             const imgShort = img.length > 15 ? img.slice(0, 12) + '...' : img;
-            const portLabels = normalizeArray(svc.ports)
+            const svcPorts = Array.isArray(svc.ports) ? svc.ports : [];
+            const portLabels = svcPorts
                 .map((port) => {
                     if (typeof port === 'string') return port;
                     if (port && typeof port === 'object') {
@@ -639,12 +480,12 @@ export const generateMultiProjectGraphviz = (projects, conflicts = []) => {
         });
         dot += `  }\n\n`;
 
-        // Connect services to shared networks
         projects.forEach((project, idx) => {
             const content = project.content || {};
             const projectPrefix = `p${idx}_`;
             Object.entries(content.services || {}).forEach(([serviceName, svc]) => {
-                normalizeArray(svc.networks).forEach(netName => {
+                const networks = Array.isArray(svc.networks) ? svc.networks : [];
+                networks.forEach(netName => {
                     if (allNetworks.get(netName)?.length > 1) {
                         const nodeId = `${projectPrefix}${sanitizeId(serviceName)}`;
                         const netId = `shared_net_${sanitizeId(netName)}`;

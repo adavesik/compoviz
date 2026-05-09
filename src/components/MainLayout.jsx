@@ -49,7 +49,7 @@ const BuilderSkeleton = () => (
  */
 export default function MainLayout() {
     // Get data state from ComposeContext
-    const { state, dispatch, errors, undo, redo, canUndo, canRedo, handleExport, loadFiles, resetProject } = useCompose();
+    const { state, ast, dispatch, errors, undo, redo, canUndo, canRedo, handleExport, loadFiles, resetProject } = useCompose();
 
     // Get UI state from UIContext
     const {
@@ -180,7 +180,7 @@ export default function MainLayout() {
         }
     };
 
-    const graphvizDot = generateGraphviz(state);
+    const graphvizDot = generateGraphviz(ast);
 
     return (
         <div className="h-screen flex flex-col overflow-hidden">
