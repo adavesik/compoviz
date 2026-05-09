@@ -74,10 +74,11 @@ export function useFileImport(loadFiles, setActiveView, isMobile, onError) {
      * Handles file import from drag-and-drop or file input
      * @param {string} content - Primary YAML content
      * @param {Array} files - Array of files to import
+     * @param {Object} overrides - Optional overrides to pass to loadFiles
      */
-    const handleImport = async (content, files = []) => {
+    const handleImport = async (content, files = [], overrides = {}) => {
         try {
-            const result = await loadFiles(content, files);
+            const result = await loadFiles(content, files, overrides);
             if (!result.success) {
                 showError('Invalid YAML: ' + (result.error || 'Unknown error'));
                 return;

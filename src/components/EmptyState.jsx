@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
-    Upload, PenTool, Eye, GitCompare, Zap, ArrowRight, Folder
+    Upload, PenTool, Eye, GitCompare, Zap, ArrowRight, Folder, Compass
 } from 'lucide-react';
+import ExamplesGallery from './ExamplesGallery';
 
 /**
  * EmptyState — The first thing users see when no compose file is loaded.
@@ -10,8 +11,9 @@ import {
  * 2. Import your own file
  * 3. Feature highlights to build confidence
  */
-export default function EmptyState({ onImport, onTryDemo, isDragging, setIsDragging, onDrop }) {
+export default function EmptyState({ onImport, onTryDemo, onLoadExample, isDragging, setIsDragging, onDrop }) {
     const [hoveredFeature, setHoveredFeature] = useState(null);
+    const [showGallery, setShowGallery] = useState(false);
 
     const features = [
         {
@@ -84,6 +86,14 @@ export default function EmptyState({ onImport, onTryDemo, isDragging, setIsDragg
                             Import Folder
                             <input type="file" accept=".yml,.yaml,.env" webkitdirectory="true" className="hidden" onChange={onImport} />
                         </label>
+
+                        <button
+                            onClick={() => setShowGallery(true)}
+                            className="btn btn-secondary px-5 py-2.5 text-sm flex items-center gap-2"
+                        >
+                            <Compass size={16} />
+                            Explore Examples
+                        </button>
                     </div>
 
                     {/* Drop zone hint */}
@@ -124,6 +134,16 @@ export default function EmptyState({ onImport, onTryDemo, isDragging, setIsDragg
                     ))}
                 </div>
             </div>
+
+            {/* ── Examples Gallery Modal ── */}
+            <ExamplesGallery
+                open={showGallery}
+                onClose={() => setShowGallery(false)}
+                onSelect={(yaml) => {
+                    if (onLoadExample) onLoadExample(yaml);
+                    setShowGallery(false);
+                }}
+            />
         </div>
     );
 }

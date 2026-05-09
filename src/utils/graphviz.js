@@ -77,7 +77,7 @@ const COLORS = {
  * Classify a service into a tier based on its image/name
  */
 const classifyServiceTier = (name, svc) => {
-    const image = (getValue(svc.image) || '').toLowerCase();
+    const image = (getValue(svc.image) || svc._resolvedImage || '').toLowerCase();
     const serviceName = name.toLowerCase();
 
     // Database/persistence tier
@@ -136,7 +136,22 @@ export const generateGraphviz = (state) => {
     // 2. Collect Ports (Ingress Zone)
     const allPorts = [];
     Object.entries(services).forEach(([name, svc]) => {
-        normalizeArray(getValue(svc.ports)).forEach((portRaw, idx) => {
+        const svcPorts = normalizeArray(getValue(svc.ports));
+
+        // Fallback to _resolvedPorts when no explicit ports
+        if (svcPorts.length === 0 && svc._resolvedPorts && svc._resolvedPorts.length > 0) {
+            svc._resolvedPorts.forEach((rp, idx) => {
+                allPorts.push({
+                    id: `port_${sanitizeId(name)}_${idx}`,
+                    label: String(rp.port),
+                    protocol: rp.protocol || 'tcp',
+                    serviceId: sanitizeId(name)
+                });
+            });
+            return;
+        }
+
+        svcPorts.forEach((portRaw, idx) => {
             const port = getValue(portRaw);
             let hostPort, protocol;
             if (typeof port === 'string') {
@@ -343,8 +358,8 @@ export const generateGraphviz = (state) => {
             const zone = serviceZones.get(name);
             const tier = serviceTiers.get(name);
             const color = COLORS[tier] || COLORS.application;
-            const imageStr = getValue(svc.image);
-            const img = imageStr ? imageStr.split(':')[0] : 'image';
+            const imageStr = getValue(svc.image) || svc._resolvedImage;
+            const img = imageStr ? imageStr.split(':')[0] : 'build';
 
             // Get service-specific icon from centralized utility
             const icon = getServiceEmoji(name, imageStr) + ' ';
