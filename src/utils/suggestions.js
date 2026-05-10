@@ -1,28 +1,11 @@
 import { normalizeToAST } from '../models/normalizeToAST.js';
 import { getEffectiveImage, getOrphanedVolumes, hasHealthcheck, hasResourceLimits } from '../models/astQueries.js';
 import { MountTypes, DependencyConditions } from '../models/ComposeAST.js';
+import { analyzeHealthchecks } from './healthcheckAnalyzer.js';
+import { SuggestionCategory, SuggestionSeverity } from './suggestionConstants.js';
 
-/**
- * Suggestion categories
- */
-export const SuggestionCategory = {
-    SECURITY: 'security',
-    PERFORMANCE: 'performance',
-    ARCHITECTURE: 'architecture',
-    BEST_PRACTICE: 'best-practice',
-    SPEC_COMPLIANCE: 'spec-compliance',
-};
-
-/**
- * Suggestion severity levels
- */
-export const SuggestionSeverity = {
-    INFO: 'info',
-    LOW: 'low',
-    MEDIUM: 'medium',
-    HIGH: 'high',
-    CRITICAL: 'critical',
-};
+// Re-export constants for backward compatibility
+export { SuggestionCategory, SuggestionSeverity };
 
 /**
  * Generate suggestions for a compose state.
@@ -57,6 +40,10 @@ export const generateSuggestions = (state) => {
             },
         });
     }
+
+    // Healthcheck intelligence findings
+    const healthcheckFindings = analyzeHealthchecks(ast);
+    suggestions.push(...healthcheckFindings);
 
     return suggestions;
 };
@@ -122,20 +109,6 @@ const analyzeService = (service, ast) => {
             entity: 'service',
             name,
             message: 'Using "latest" tag can cause unexpected behavior. Consider pinning to a specific version.',
-            action: null,
-        });
-    }
-
-    // Rule 4: Missing health check for long-running services
-    if (!hasHealthcheck(service) && service.restart && !isOneoffService(service)) {
-        suggestions.push({
-            id: `${name}-missing-healthcheck`,
-            type: 'suggestion',
-            category: SuggestionCategory.PERFORMANCE,
-            severity: SuggestionSeverity.LOW,
-            entity: 'service',
-            name,
-            message: 'Consider adding a health check to improve dependency management and container orchestration.',
             action: null,
         });
     }
@@ -309,13 +282,6 @@ const isProductionDataTarget = (target) => {
         '/data', '/storage', '/media', '/library'
     ];
     return prodPaths.some(path => target.startsWith(path));
-};
-
-/**
- * Check if service is a one-off/batch job
- */
-const isOneoffService = (service) => {
-    return service.restart === 'no' || (!service.restart && service._raw?.command);
 };
 
 /**
