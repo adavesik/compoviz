@@ -33,3 +33,6 @@ fixtures/
 
 # AI-generated project docs
 CLAUDE.md
+
+# Windows download metadata (WSL)
+*:Zone.Identifier
