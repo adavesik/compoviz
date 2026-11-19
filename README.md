@@ -1,12 +1,40 @@
+<div align="center">
+
+<a href="https://compoviz.pro">
+  <img src="docs/assets/readme/logo.jpg" alt="Compoviz logo: a glowing cube connected to a network graph" width="220">
+</a>
+
 # Compoviz
 
-**See the architecture behind your Docker Compose files.**
+### See the architecture behind your Docker Compose files.
 
-Compoviz is an open-source, browser-based workspace for exploring, editing, and visualizing Docker Compose projects. See how your services fit together, build stacks visually, compare configurations, and learn from real examples.
+Explore, edit, and visualize Docker Compose projects in your browser.<br>
+Build stacks visually, compare configurations, and learn from real examples.
 
-**[Open Compoviz](https://compoviz.pro)** · **[Self-host](#self-host)** · **[Explore examples](#explore-real-compose-projects)** · **[Contribute](CONTRIBUTING.md)**
+<p>
+  <a href="https://compoviz.pro"><img src="https://img.shields.io/badge/%E2%96%B6%20Live%20app-compoviz.pro-6EE7F2?style=for-the-badge&labelColor=1a1033" alt="Open the live app at compoviz.pro"></a>
+</p>
 
-No account required. Compose files you import are processed in your browser. [MIT licensed](LICENSE).
+<p>
+  <a href="https://github.com/adavesik/compoviz/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/adavesik/compoviz/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white&labelColor=1a1033" alt="CI status"></a>
+  <a href="https://github.com/adavesik/compoviz/releases"><img src="https://img.shields.io/github/v/release/adavesik/compoviz?color=8B5CF6&labelColor=1a1033" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/adavesik/compoviz?color=22D3EE&labelColor=1a1033" alt="MIT license"></a>
+  <a href="https://github.com/adavesik/compoviz/stargazers"><img src="https://img.shields.io/github/stars/adavesik/compoviz?style=flat&logo=github&color=E5A84B&labelColor=1a1033" alt="GitHub stars"></a>
+  <a href="https://github.com/adavesik/compoviz/pkgs/container/compoviz"><img src="https://img.shields.io/badge/ghcr.io-compoviz-2496ED?logo=docker&logoColor=white&labelColor=1a1033" alt="Docker image on GHCR"></a>
+</p>
+
+<p>
+  <a href="https://compoviz.pro"><b>Open Compoviz</b></a> &nbsp;·&nbsp;
+  <a href="#self-host"><b>Self-host</b></a> &nbsp;·&nbsp;
+  <a href="#explore-real-compose-projects"><b>Explore examples</b></a> &nbsp;·&nbsp;
+  <a href="CONTRIBUTING.md"><b>Contribute</b></a>
+</p>
+
+<sub>No account required. Compose files you import are processed in your browser.</sub>
+
+</div>
+
+<br>
 
 ![Compoviz Build mode showing Docker services, networks, dependencies, volumes, and secrets on an interactive canvas](docs/assets/readme/build-canvas.png)
 
