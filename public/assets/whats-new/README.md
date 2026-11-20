@@ -2,7 +2,15 @@
 
 This directory contains screenshots/GIFs for the "What's New" modal.
 
-## Required Screenshots
+## v1.0.0 Hero
+
+**File**: `compare-v1.webp`
+**Size**: 1760x580px (2x for the 880x290 hero, cropped with `object-fit: cover`)
+**Content**: Compare mode with the built-in demo (`src/data/compareDemo.js`) loaded, the `*:8080` port conflict selected, and the "Move to free host port 8081" fix visible in the inspector
+
+---
+
+## Required Screenshots (v0.3.0 slides)
 
 Place your screenshots in this directory with the following names:
 
