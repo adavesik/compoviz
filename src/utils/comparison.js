@@ -79,9 +79,93 @@ export const extractHostPort = (portMapping) => {
     return `${ip}:${hostPort}`;
 };
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const WILDCARD_IPS = new Set(['', '0.0.0.0', '::', '[::]']);
+const MAX_RANGE_EXPANSION = 1024;
+
+/**
+ * Normalize a project name the same way Docker Compose does
+ * (lowercase, only [a-z0-9_-], must start with a letter or digit).
+ */
+export const normalizeProjectName = (name) => {
+    const normalized = String(name || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '');
+    return normalized.replace(/^[^a-z0-9]+/, '');
+};
+
+/** Compose project name actually used at runtime for a compare project. */
+export const getEffectiveProjectName = (project) =>
+    normalizeProjectName(project?.content?.name || project?.name || '');
+
+const isHostPathSource = (source) =>
+    typeof source === 'string' && (source.startsWith('.') || source.startsWith('/') || source.startsWith('~'));
+
+/** Expand "8000-8002" → [8000, 8001, 8002]. Returns [] for unparseable values. */
+const expandPortRange = (value) => {
+    const str = String(value ?? '').trim();
+    if (!str) return [];
+    const range = str.match(/^(\d+)-(\d+)$/);
+    if (range) {
+        const start = Number(range[1]);
+        const end = Number(range[2]);
+        if (end < start || end - start > MAX_RANGE_EXPANSION) return [start];
+        return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+    }
+    return /^\d+$/.test(str) ? [Number(str)] : [];
+};
+
+/**
+ * Whether a raw port entry publishes a fixed host port.
+ * "80" (container port only) and long syntax without `published`
+ * get an ephemeral host port and can never collide.
+ */
+const publishesFixedHostPort = (rawPort) => {
+    if (rawPort && typeof rawPort === 'object') {
+        return rawPort.published !== undefined && rawPort.published !== null && rawPort.published !== '';
+    }
+    const str = String(rawPort ?? '').replace(/\/(tcp|udp|sctp)$/i, '');
+    if (str.startsWith('[')) {
+        // [ip]:host:container or [ip]:container
+        const rest = str.slice(str.indexOf(']') + 2);
+        return rest.includes(':');
+    }
+    return str.includes(':');
+};
+
+const formatBinding = (ip, port) => {
+    const host = ip || '0.0.0.0';
+    return host.includes(':') && !host.startsWith('[') ? `[${host}]:${port}` : `${host}:${port}`;
+};
+
+const ipsOverlap = (a, b) => a === b || WILDCARD_IPS.has(a) || WILDCARD_IPS.has(b);
+
+const uniq = (arr) => [...new Set(arr)];
+
+const makeResult = ({ category, key, ...rest }) => ({
+    id: `${category}:${key}`,
+    category,
+    key,
+    ...rest,
+});
+
+const summarizeProjects = (usages) => ({
+    projects: uniq(usages.map(u => u.project)),
+    projectIds: uniq(usages.map(u => u.projectId)),
+});
+
+// ─── Main comparison ───────────────────────────────────────────────────────
+
 /**
  * Compare multiple projects and detect conflicts and shared resources.
- * Normalizes each project to AST for consistent data reads.
+ *
+ * Every result carries:
+ *  - `id`        stable identifier (`category:key`) used for selection / dismissal
+ *  - `key`       the conflicting value (binding, name, path, …)
+ *  - `projects`  project names, `projectIds` project ids
+ *  - `details`   array of usages `{ projectId, project, service?, mapping?, ... }`
+ *
  * @param {Array<{id: string, name: string, content: object}>} projects
  * @returns {ComparisonResult[]}
  */
@@ -89,175 +173,269 @@ export function compareProjects(projects) {
     const results = [];
     if (!projects || projects.length < 2) return results;
 
-    // Normalize each project to AST
-    const projectASTs = projects.map(project => ({
-        name: project.name,
+    const entries = projects.map((project, index) => ({
+        projectId: project.id ?? `project-${index}`,
+        project: project.name,
+        runtimeName: getEffectiveProjectName(project),
+        content: project.content || {},
         ast: normalizeToAST(project.content || {}),
     }));
 
-    // Collect data from all projects using AST
-    const portMap = new Map(); // hostBinding -> [{project, service}]
-    const containerNameMap = new Map(); // containerName -> [{project, service}]
-    const serviceNameMap = new Map(); // serviceName -> [project]
-    const volumeMap = new Map(); // volumeSource -> [{project, service}]
-    const networkMap = new Map(); // networkName -> [project]
-    const envFileMap = new Map(); // envFilePath -> [{project, service}]
+    // ── Compose project name collision ──
+    const runtimeNames = new Map();
+    for (const e of entries) {
+        if (!e.runtimeName) continue;
+        if (!runtimeNames.has(e.runtimeName)) runtimeNames.set(e.runtimeName, []);
+        runtimeNames.get(e.runtimeName).push({ projectId: e.projectId, project: e.project });
+    }
+    for (const [runtimeName, usages] of runtimeNames) {
+        if (usages.length < 2) continue;
+        results.push(makeResult({
+            type: 'conflict',
+            category: 'project_name',
+            severity: 'error',
+            key: runtimeName,
+            message: `Compose project name "${runtimeName}" is used by multiple projects`,
+            explanation: 'Docker Compose identifies stacks by project name. Running these files would treat them as one project: containers overwrite each other and "--remove-orphans" deletes the other stack.',
+            ...summarizeProjects(usages),
+            details: usages,
+        }));
+    }
 
-    for (const { name: projectName, ast } of projectASTs) {
-        // Collect services data from AST
-        for (const service of ast.services) {
-            const serviceName = service.id;
+    // ── Collect per-service data ──
+    const portUsages = new Map(); // `${proto}/${port}` -> [{...}]
+    const containerNames = new Map();
+    const serviceNames = new Map();
+    const hostPaths = new Map();
+    const namedVolumes = new Map();
+    const envFiles = new Map();
 
-            // Service names
-            if (!serviceNameMap.has(serviceName)) serviceNameMap.set(serviceName, []);
-            serviceNameMap.get(serviceName).push(projectName);
+    const push = (map, key, value) => {
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(value);
+    };
 
-            // Container names
-            if (service.containerName) {
-                if (!containerNameMap.has(service.containerName)) containerNameMap.set(service.containerName, []);
-                containerNameMap.get(service.containerName).push({ project: projectName, service: serviceName });
-            }
+    for (const e of entries) {
+        const rawServices = e.content.services || {};
+        for (const service of e.ast.services) {
+            const base = { projectId: e.projectId, project: e.project, service: service.id };
+            push(serviceNames, service.id, base);
 
-            // Ports — use pre-parsed port bindings from AST
-            for (const port of service.ports) {
-                // Build binding string matching extractHostPort format for IPv6 compat
-                let binding;
-                if (port.hostIp && port.hostIp.includes(':')) {
-                    // IPv6 — wrap in brackets
-                    binding = `[${port.hostIp}]:${port.hostPort}`;
-                } else {
-                    binding = `${port.hostIp || '0.0.0.0'}:${port.hostPort}`;
+            if (service.containerName) push(containerNames, service.containerName, base);
+
+            const rawPorts = Array.isArray(rawServices[service.id]?.ports) ? rawServices[service.id].ports : [];
+            service.ports.forEach((port, portIndex) => {
+                if (!publishesFixedHostPort(rawPorts[portIndex] ?? port.raw)) return;
+                const hostIp = port.hostIp || '0.0.0.0';
+                const protocol = (port.protocol || 'tcp').toLowerCase();
+                for (const hostPort of expandPortRange(port.hostPort)) {
+                    push(portUsages, `${protocol}/${hostPort}`, {
+                        ...base, mapping: port.raw, portIndex, hostIp, hostPort, protocol,
+                    });
                 }
+            });
 
-                if (binding && port.hostPort) {
-                    if (!portMap.has(binding)) portMap.set(binding, []);
-                    portMap.get(binding).push({ project: projectName, service: serviceName, mapping: port.raw });
-                }
-            }
-
-            // Volumes — use pre-parsed volume mounts from AST
             for (const vol of service.volumes) {
-                const source = vol.source;
-                if (source) {
-                    if (!volumeMap.has(source)) volumeMap.set(source, []);
-                    volumeMap.get(source).push({ project: projectName, service: serviceName, mapping: vol.raw });
+                if (!vol.source) continue;
+                if (vol.type === MountTypes.BIND || isHostPathSource(vol.source)) {
+                    push(hostPaths, vol.source, { ...base, mapping: vol.raw, readOnly: !!vol.readOnly });
+                } else if (vol.type === MountTypes.VOLUME || !vol.type) {
+                    push(namedVolumes, vol.source, { ...base, mapping: vol.raw });
                 }
             }
 
-            // Env files — pre-normalized in AST
-            for (const envFile of service.envFiles) {
-                if (!envFileMap.has(envFile)) envFileMap.set(envFile, []);
-                envFileMap.get(envFile).push({ project: projectName, service: serviceName });
-            }
-        }
-
-        // Collect networks from AST
-        for (const network of ast.networks) {
-            if (!networkMap.has(network.id)) networkMap.set(network.id, []);
-            networkMap.get(network.id).push(projectName);
+            for (const envFile of service.envFiles) push(envFiles, envFile, { ...base, mapping: envFile });
         }
     }
 
-    // Detect port conflicts
-    for (const [binding, usages] of portMap.entries()) {
-        if (usages.length > 1) {
-            const projectsInvolved = [...new Set(usages.map(u => u.project))];
-            if (projectsInvolved.length > 1) {
-                results.push({
-                    type: 'conflict',
-                    category: 'port',
-                    severity: 'error',
-                    message: `Port binding ${binding} is used by multiple projects`,
-                    projects: projectsInvolved,
-                    details: usages,
-                });
+    // ── Port conflicts (IP-aware, protocol-aware, wildcard-aware) ──
+    for (const [portKey, usages] of portUsages) {
+        if (uniq(usages.map(u => u.projectId)).length < 2) continue;
+        const involved = new Set();
+        for (let i = 0; i < usages.length; i++) {
+            for (let j = i + 1; j < usages.length; j++) {
+                const a = usages[i];
+                const b = usages[j];
+                if (a.projectId !== b.projectId && ipsOverlap(a.hostIp, b.hostIp)) {
+                    involved.add(i);
+                    involved.add(j);
+                }
             }
         }
+        if (involved.size === 0) continue;
+
+        const conflicting = usages.filter((_, i) => involved.has(i));
+        // Collapse port ranges: one usage entry per (project, service, mapping)
+        const deduped = [];
+        const seen = new Set();
+        for (const u of conflicting) {
+            const k = `${u.projectId}|${u.service}|${u.portIndex}`;
+            if (!seen.has(k)) { seen.add(k); deduped.push(u); }
+        }
+        const [protocol, hostPort] = portKey.split('/');
+        const ips = uniq(deduped.map(u => u.hostIp));
+        const binding = ips.length === 1 ? formatBinding(ips[0], hostPort) : `*:${hostPort}`;
+        const protoSuffix = protocol === 'tcp' ? '' : `/${protocol}`;
+
+        results.push(makeResult({
+            type: 'conflict',
+            category: 'port',
+            severity: 'error',
+            key: `${binding}${protoSuffix}`,
+            port: Number(hostPort),
+            protocol,
+            message: `Port binding ${binding}${protoSuffix} is used by multiple projects`,
+            explanation: ips.length === 1
+                ? 'Only one container can bind a host port at a time. The second stack will fail with "port is already allocated".'
+                : 'A wildcard binding (0.0.0.0 / ::) overlaps every specific IP on the same port, so these bindings collide.',
+            ...summarizeProjects(deduped),
+            details: deduped,
+        }));
     }
 
-    // Detect container name conflicts
-    for (const [name, usages] of containerNameMap.entries()) {
-        if (usages.length > 1) {
-            const projectsInvolved = [...new Set(usages.map(u => u.project))];
-            if (projectsInvolved.length > 1) {
-                results.push({
-                    type: 'conflict',
-                    category: 'container_name',
-                    severity: 'error',
-                    message: `Container name "${name}" is used by multiple projects`,
-                    projects: projectsInvolved,
-                    details: usages,
-                });
+    // ── Container name conflicts (container names are global per Docker host) ──
+    for (const [name, usages] of containerNames) {
+        if (uniq(usages.map(u => u.projectId)).length < 2) continue;
+        results.push(makeResult({
+            type: 'conflict',
+            category: 'container_name',
+            severity: 'error',
+            key: name,
+            message: `Container name "${name}" is used by multiple projects`,
+            explanation: 'container_name is global on a Docker host. The second stack fails with "container name is already in use".',
+            ...summarizeProjects(usages),
+            details: usages,
+        }));
+    }
+
+    // ── Host path bind mounts ──
+    for (const [source, usages] of hostPaths) {
+        if (uniq(usages.map(u => u.projectId)).length < 2) continue;
+        const allReadOnly = usages.every(u => u.readOnly);
+        results.push(makeResult({
+            type: allReadOnly ? 'shared' : 'conflict',
+            category: 'volume',
+            severity: allReadOnly ? 'info' : 'warning',
+            key: source,
+            message: `Host path "${source}" is mounted by multiple projects`,
+            explanation: allReadOnly
+                ? 'All mounts are read-only, so sharing is safe.'
+                : 'Relative paths resolve against each compose file\'s directory, so they may or may not be the same folder. If they are, concurrent writers can corrupt data.',
+            ...summarizeProjects(usages),
+            details: usages,
+        }));
+    }
+
+    // ── Named volumes: project-scoped unless external or explicitly named ──
+    const volumeRuntimeName = (entry, volName) => {
+        const node = entry.ast.volumeMap?.get(volName);
+        const raw = entry.content.volumes?.[volName];
+        const explicitName = raw && typeof raw === 'object' && typeof raw.name === 'string' ? raw.name : null;
+        if (node?.external) return explicitName || volName;
+        return explicitName || `${entry.runtimeName}_${volName}`;
+    };
+    for (const [volName, usages] of namedVolumes) {
+        if (uniq(usages.map(u => u.projectId)).length < 2) continue;
+        const runtime = uniq(usages.map(u => volumeRuntimeName(entries.find(e => e.projectId === u.projectId), volName)));
+        const reallyShared = runtime.length === 1;
+        results.push(makeResult({
+            type: reallyShared ? 'shared' : 'isolated',
+            category: 'volume',
+            severity: 'info',
+            key: volName,
+            message: reallyShared
+                ? `Volume "${volName}" is shared by multiple projects`
+                : `Volume "${volName}" is used by multiple projects but each gets its own copy`,
+            explanation: reallyShared
+                ? 'All projects resolve to the same Docker volume, so data is shared between stacks.'
+                : `Compose prefixes volumes with the project name (${runtime.join(', ')}), so data is NOT shared. Use "external" or an explicit "name" if sharing is intended.`,
+            ...summarizeProjects(usages),
+            details: usages,
+        }));
+    }
+
+    // ── Networks: project-scoped unless external or explicitly named ──
+    const networkUsages = new Map();
+    for (const e of entries) {
+        const attachedBy = new Map();
+        for (const service of e.ast.services) {
+            for (const att of service.networks) {
+                if (!attachedBy.has(att.network)) attachedBy.set(att.network, []);
+                attachedBy.get(att.network).push(service.id);
             }
         }
-    }
-
-    // Detect shared volumes (could be intentional or conflict)
-    for (const [source, usages] of volumeMap.entries()) {
-        if (usages.length > 1) {
-            const projectsInvolved = [...new Set(usages.map(u => u.project))];
-            if (projectsInvolved.length > 1) {
-                const isHostPath = source.startsWith('.') || source.startsWith('/');
-                results.push({
-                    type: isHostPath ? 'conflict' : 'shared',
-                    category: 'volume',
-                    severity: isHostPath ? 'warning' : 'info',
-                    message: isHostPath
-                        ? `Host path "${source}" is mounted by multiple projects`
-                        : `Volume "${source}" is used by multiple projects`,
-                    projects: projectsInvolved,
-                    details: usages,
-                });
-            }
-        }
-    }
-
-    // Detect shared networks (often intentional)
-    for (const [networkName, projectsList] of networkMap.entries()) {
-        if (projectsList.length > 1) {
-            results.push({
-                type: 'shared',
-                category: 'network',
-                severity: 'info',
-                message: `Network "${networkName}" is defined in multiple projects`,
-                projects: projectsList,
-                details: { networkName },
+        for (const network of e.ast.networks) {
+            const raw = e.content.networks?.[network.id];
+            const explicitName = raw && typeof raw === 'object' && typeof raw.name === 'string' ? raw.name : null;
+            const runtimeName = network.external
+                ? (explicitName || network.id)
+                : (explicitName || `${e.runtimeName}_${network.id}`);
+            const services = attachedBy.get(network.id) || [];
+            push(networkUsages, network.id, {
+                projectId: e.projectId,
+                project: e.project,
+                runtimeName,
+                external: network.external,
+                services,
             });
         }
     }
-
-    // Detect shared env files
-    for (const [envFile, usages] of envFileMap.entries()) {
-        if (usages.length > 1) {
-            const projectsInvolved = [...new Set(usages.map(u => u.project))];
-            if (projectsInvolved.length > 1) {
-                results.push({
-                    type: 'shared',
-                    category: 'env_file',
-                    severity: 'info',
-                    message: `Env file "${envFile}" is used by multiple projects`,
-                    projects: projectsInvolved,
-                    details: usages,
-                });
-            }
-        }
+    for (const [networkName, usages] of networkUsages) {
+        if (uniq(usages.map(u => u.projectId)).length < 2) continue;
+        const runtime = uniq(usages.map(u => u.runtimeName));
+        const reallyShared = runtime.length === 1;
+        const details = usages.flatMap(u => (u.services.length > 0
+            ? u.services.map(service => ({ ...u, service }))
+            : [{ ...u, service: null }]));
+        results.push(makeResult({
+            type: reallyShared ? 'shared' : 'isolated',
+            category: 'network',
+            severity: 'info',
+            key: networkName,
+            runtimeNames: runtime,
+            message: reallyShared
+                ? `Network "${networkName}" is shared across projects`
+                : `Network "${networkName}" is defined in multiple projects but isolated per project`,
+            explanation: reallyShared
+                ? 'Services from these projects can reach each other over this network.'
+                : `Compose creates a separate network per project (${runtime.join(', ')}). Services in different projects cannot reach each other through it.`,
+            ...summarizeProjects(usages),
+            details,
+        }));
     }
 
-    // Detect duplicate service names (informational)
-    for (const [serviceName, projectsList] of serviceNameMap.entries()) {
-        if (projectsList.length > 1) {
-            results.push({
-                type: 'shared',
-                category: 'service_name',
-                severity: 'info',
-                message: `Service name "${serviceName}" exists in multiple projects`,
-                projects: projectsList,
-                details: { serviceName },
-            });
-        }
+    // ── Shared env files ──
+    for (const [envFile, usages] of envFiles) {
+        if (uniq(usages.map(u => u.projectId)).length < 2) continue;
+        results.push(makeResult({
+            type: 'shared',
+            category: 'env_file',
+            severity: 'info',
+            key: envFile,
+            message: `Env file "${envFile}" is used by multiple projects`,
+            explanation: 'Changing this file affects every project that loads it.',
+            ...summarizeProjects(usages),
+            details: usages,
+        }));
     }
 
-    return results;
+    // ── Duplicate service names (informational, Compose namespaces them) ──
+    for (const [serviceName, usages] of serviceNames) {
+        if (uniq(usages.map(u => u.projectId)).length < 2) continue;
+        results.push(makeResult({
+            type: 'shared',
+            category: 'service_name',
+            severity: 'info',
+            key: serviceName,
+            message: `Service name "${serviceName}" exists in multiple projects`,
+            explanation: 'Compose namespaces services per project, so this is fine unless the projects share a network, where the DNS name becomes ambiguous.',
+            ...summarizeProjects(usages),
+            details: usages,
+        }));
+    }
+
+    const order = { error: 0, warning: 1, info: 2 };
+    return results.sort((a, b) => order[a.severity] - order[b.severity]);
 }
 
 /**
@@ -271,4 +449,24 @@ export function getComparisonSummary(results) {
         warnings: results.filter(r => r.severity === 'warning').length,
         info: results.filter(r => r.severity === 'info').length,
     };
+}
+
+/**
+ * Index results by `${projectId}::${service}` for quick per-node lookup.
+ * @param {ComparisonResult[]} results
+ * @returns {Map<string, ComparisonResult[]>}
+ */
+export function indexResultsByService(results) {
+    const index = new Map();
+    for (const result of results) {
+        const details = Array.isArray(result.details) ? result.details : [];
+        for (const d of details) {
+            if (!d.service) continue;
+            const key = `${d.projectId}::${d.service}`;
+            if (!index.has(key)) index.set(key, []);
+            const list = index.get(key);
+            if (!list.includes(result)) list.push(result);
+        }
+    }
+    return index;
 }

@@ -33,7 +33,7 @@ describe('compareProjects', () => {
             expect(portConflicts[0].message).toContain('127.0.0.1:443');
         });
 
-        it('should NOT detect conflicts when different IP bindings use same port number', () => {
+        it('should NOT detect conflicts when two different specific IPs use the same port', () => {
             const projects = [
                 {
                     id: 'proj1',
@@ -49,7 +49,7 @@ describe('compareProjects', () => {
                     name: 'Project 2',
                     content: {
                         services: {
-                            api: { ports: ['80:80'] } // Binds to 0.0.0.0:80
+                            api: { ports: ['192.168.1.10:80:80'] }
                         }
                     }
                 }
@@ -58,8 +58,21 @@ describe('compareProjects', () => {
             const results = compareProjects(projects);
             const portConflicts = results.filter(r => r.category === 'port');
 
-            // Should have no conflicts because 127.0.0.1:80 and 0.0.0.0:80 are different bindings
+            // 127.0.0.1:80 and 192.168.1.10:80 are distinct sockets
             expect(portConflicts).toHaveLength(0);
+        });
+
+        it('should detect conflicts when a wildcard binding overlaps a specific IP', () => {
+            const projects = [
+                { id: 'proj1', name: 'Project 1', content: { services: { web: { ports: ['127.0.0.1:80:80'] } } } },
+                { id: 'proj2', name: 'Project 2', content: { services: { api: { ports: ['80:80'] } } } }, // 0.0.0.0:80
+            ];
+
+            const portConflicts = compareProjects(projects).filter(r => r.category === 'port');
+
+            // 0.0.0.0 covers every interface, including 127.0.0.1
+            expect(portConflicts).toHaveLength(1);
+            expect(portConflicts[0].details.map(d => d.service).sort()).toEqual(['api', 'web']);
         });
 
         it('should detect conflicts when multiple projects bind to all interfaces (0.0.0.0)', () => {
@@ -91,7 +104,7 @@ describe('compareProjects', () => {
             expect(portConflicts[0].message).toContain('0.0.0.0:443');
         });
 
-        it('should handle port mappings with protocol suffix', () => {
+        it('should NOT flag tcp and udp on the same port as a conflict', () => {
             const projects = [
                 {
                     id: 'proj1',
@@ -116,7 +129,18 @@ describe('compareProjects', () => {
             const results = compareProjects(projects);
             const portConflicts = results.filter(r => r.category === 'port');
 
-            // Both bind to 127.0.0.1:3000, so it's a conflict
+            // TCP and UDP have separate port spaces
+            expect(portConflicts).toHaveLength(0);
+        });
+
+        it('should detect conflicts for the same protocol suffix', () => {
+            const projects = [
+                { id: 'proj1', name: 'Project 1', content: { services: { web: { ports: ['127.0.0.1:3000:3000/tcp'] } } } },
+                { id: 'proj2', name: 'Project 2', content: { services: { api: { ports: ['127.0.0.1:3000:3000'] } } } },
+            ];
+
+            const portConflicts = compareProjects(projects).filter(r => r.category === 'port');
+
             expect(portConflicts).toHaveLength(1);
             expect(portConflicts[0].message).toContain('127.0.0.1:3000');
         });
