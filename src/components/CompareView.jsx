@@ -2,9 +2,10 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
     Upload, Trash2, ZoomIn, ZoomOut, Maximize, AlertTriangle, Info, XCircle, Plus, Undo2, Redo2,
     Download, ImageDown, ClipboardPaste, FileCode2, ChevronDown, Pencil, RotateCcw, Copy, Focus,
-    Search, Eye, EyeOff, Sparkles, Box, ExternalLink, Layers, Keyboard,
+    Search, Eye, EyeOff, Sparkles, Box, ExternalLink, Layers, Keyboard, Play,
 } from 'lucide-react';
 import { useMultiProject } from '../hooks/useMultiProject';
+import { compareDemoProjects } from '../data/compareDemo';
 import { useCompose } from '../hooks/useCompose';
 import { useUI } from '../context/UIContext';
 import { compareProjects } from '../utils/comparison';
@@ -40,7 +41,7 @@ function ProjectChip({ project, color, issueCount, onOpenMenu, onSelect, active 
     );
 }
 
-function EmptyState({ projectCount, maxProjects, onUpload, onPaste, onUseEditor, editorHasServices }) {
+function EmptyState({ projectCount, maxProjects, onUpload, onPaste, onUseEditor, onLoadDemo, editorHasServices }) {
     return (
         <div className="h-full flex flex-col items-center justify-center p-8">
             <div className="max-w-xl w-full text-center space-y-6">
@@ -69,6 +70,14 @@ function EmptyState({ projectCount, maxProjects, onUpload, onPaste, onUseEditor,
                         <FileCode2 size={16} /> Use editor project
                     </button>
                 </div>
+                {projectCount === 0 && (
+                    <p className="text-sm text-text-secondary">
+                        No files handy?{' '}
+                        <button type="button" onClick={onLoadDemo} className="inline-flex items-center gap-1 font-semibold text-accent hover:underline underline-offset-4">
+                            <Play size={13} aria-hidden="true" /> Load a demo comparison
+                        </button>
+                    </p>
+                )}
                 <div className="grid grid-cols-3 gap-3 text-left">
                     <div className="p-4 glass rounded-2xl border border-border/50">
                         <AlertTriangle className="text-warning mb-2" size={18} />
@@ -107,6 +116,7 @@ function CompareView() {
         projects,
         addProject,
         addProjectFromState,
+        loadProjects,
         removeProject,
         renameProject,
         resetProject,
@@ -232,6 +242,12 @@ function CompareView() {
         if (result.success) toast.success(`Added "${result.project.name}" from the editor`);
         else toast.error(result.error);
     }, [addProjectFromState, editorState, toast]);
+
+    const loadDemo = useCallback(() => {
+        const result = loadProjects(compareDemoProjects);
+        if (result.success) toast.success('Demo loaded. Press J to step through the issues.');
+        else toast.error(`Could not load the demo: ${result.error}`);
+    }, [loadProjects, toast]);
 
     // ── Project actions ──
     const downloadProject = useCallback((project) => {
@@ -514,6 +530,7 @@ function CompareView() {
                         onUpload={() => fileInputRef.current?.click()}
                         onPaste={() => setPasteOpen(true)}
                         onUseEditor={addFromEditor}
+                        onLoadDemo={loadDemo}
                         editorHasServices={editorHasServices}
                     />
                 ) : (

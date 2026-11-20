@@ -2,12 +2,77 @@
  * Feature announcements for "What's New" modal
  * Add new announcements at the top of the array
  *
- * Two formats supported:
+ * Three formats supported:
+ * - hero: hero image + feature grid (layout: 'hero')
  * - slides: array of slide objects (carousel mode)
  * - highlights: array of highlight objects (single-screen mode)
+ *
+ * Hero format:
+ * - icon: lucide icon key, see ICONS in WhatsNewModal.jsx
+ * - tone: 'error' | 'accent' | 'secret' | 'config' | 'success'
+ * - descriptions may wrap inline code in backticks
+ * - action types: 'dismiss' | 'open-compare-demo' | 'load-example' | 'link' (opens href)
+ *
+ * The modal shows the first entry once per `version`.
  */
 
 export const announcements = [
+    {
+        version: '1.0.0',
+        date: '2026-11-20',
+        layout: 'hero',
+        badge: 'First stable release',
+        hero: {
+            src: '/assets/whats-new/compare-v1.webp',
+            alt: 'Compare mode showing a host port 8080 collision between the shop and blog stacks, with a suggested fix that moves blog/web to port 8081.',
+        },
+        eyebrow: 'Compare, rebuilt',
+        title: 'Compoviz',
+        titleAccent: '1.0',
+        lede: 'Drop in up to three Compose stacks and find out whether they can share one Docker host. When they can\'t, Compoviz shows exactly why and fixes it for you.',
+        features: [
+            {
+                icon: 'scan-search',
+                tone: 'error',
+                title: 'Sharper detection',
+                description: 'Wildcard IPs, protocols and port ranges are checked properly, ephemeral ports are ignored. Catches project-name collisions and project-scoped networks and volumes.',
+            },
+            {
+                icon: 'sparkles',
+                tone: 'accent',
+                title: 'One-click fixes',
+                description: 'Remap ports, rename containers, split bind mounts or share a network. Every fix shows a diff first, `Ctrl+Z` undoes it, and fixed files download in one go.',
+            },
+            {
+                icon: 'network',
+                tone: 'secret',
+                title: 'Conflicts on the map',
+                description: 'Port chips on every service and dedicated conflict nodes show who claims what. Shared and isolated resources get their own lane.',
+            },
+            {
+                icon: 'mouse-pointer-click',
+                tone: 'config',
+                title: 'Inspect anything',
+                description: 'Click a service, issue or project for details. Right-click for quick fixes, `J`/`K` to step through issues, smooth zoom and fit-to-view.',
+            },
+        ],
+        also: {
+            icon: 'heart-pulse',
+            tone: 'success',
+            label: 'Also new',
+            title: 'Healthcheck intelligence',
+            description: 'flags missing, fake and weak healthchecks, and `service_healthy` dependencies that can never start.',
+        },
+        primaryAction: {
+            label: 'Try the Compare demo',
+            type: 'open-compare-demo',
+        },
+        secondaryAction: {
+            label: 'Release notes',
+            type: 'link',
+            href: 'https://github.com/adavesik/compoviz/releases',
+        },
+    },
     {
         version: '0.5.0',
         date: '2026-05-09',
@@ -138,16 +203,18 @@ export function getLatestAnnouncement() {
 }
 
 /**
- * Check if user should see announcement for current version
+ * Check if user should see the announcement with the given version.
+ * Keyed by announcement version (not app version) so patch releases
+ * without a new announcement don't re-show the previous one.
  */
-export function shouldShowAnnouncement(appVersion) {
+export function shouldShowAnnouncement(announcementVersion) {
     const lastSeenVersion = localStorage.getItem('lastSeenAnnouncementVersion');
 
     if (!lastSeenVersion) {
         return true;
     }
 
-    return appVersion !== lastSeenVersion;
+    return announcementVersion !== lastSeenVersion;
 }
 
 /**

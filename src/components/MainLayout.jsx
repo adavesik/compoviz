@@ -29,6 +29,8 @@ import { ProfilesPanel } from '../features/sidebar';
 import Footer from './Footer.jsx';
 import WhatsNewModal from './WhatsNewModal.jsx';
 import { getExample } from '../data/examples.js';
+import { compareDemoProjects } from '../data/compareDemo.js';
+import { seedCompareProjects } from '../hooks/useMultiProject.js';
 
 // Lazy load the Visual Builder (React Flow) - only loads when user clicks Build tab
 const VisualBuilder = lazy(() => import('./VisualBuilder'));
@@ -95,6 +97,20 @@ export default function MainLayout() {
                 if (exampleYaml) {
                     await handleImport(exampleYaml);
                     setActiveView('build');
+                }
+                break;
+            }
+            case 'open-compare-demo': {
+                // Compare mode isn't mounted while the modal is open, so seeding
+                // storage is picked up when CompareView mounts below.
+                const result = seedCompareProjects(compareDemoProjects);
+                setActiveView('compare');
+                if (result.seeded) {
+                    toast.success('Demo loaded. Press J to step through the issues.');
+                } else if (result.reason === 'existing') {
+                    toast.info('Opened your saved comparison. Clear it to try the demo.');
+                } else {
+                    toast.error(`Could not load the demo: ${result.error}`);
                 }
                 break;
             }

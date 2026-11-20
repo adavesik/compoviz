@@ -27,6 +27,43 @@ const toContent = (parsed) => ({
     configs: parsed?.configs || {},
 });
 
+/**
+ * Build a compare project from parsed compose content.
+ * @param {object} parsed - Parsed compose document
+ * @param {string} fileName - Source file name
+ * @param {string} [displayName] - Optional display name (defaults to `name:` or file name)
+ * @returns {{ project: Project } | { error: string }}
+ */
+const createProject = (parsed, fileName = 'Untitled', displayName) => {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return { error: 'File is not a valid compose document' };
+    }
+    if (!parsed.services || typeof parsed.services !== 'object' || Object.keys(parsed.services).length === 0) {
+        return { error: 'No services found in compose file' };
+    }
+    const content = toContent(parsed);
+    return {
+        project: {
+            id: generateId(),
+            name: displayName || parsed.name || String(fileName).replace(/\.ya?ml$/i, '') || 'Untitled',
+            fileName: /\.ya?ml$/i.test(fileName) ? fileName : 'docker-compose.yml',
+            content,
+            originalContent: content,
+            modified: false,
+        },
+    };
+};
+
+/**
+ * Turn `{ name, fileName, yaml }` entries into projects.
+ * Throws if any entry is invalid, so callers never load a partial set.
+ */
+const createProjectsFromYaml = (entries) => entries.slice(0, MAX_COMPARE_PROJECTS).map((entry) => {
+    const result = createProject(parseYaml(entry.yaml), entry.fileName, entry.name);
+    if (result.error) throw new Error(`${entry.fileName}: ${result.error}`);
+    return result.project;
+});
+
 const loadPersisted = () => {
     try {
         const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(COMPARE_STORAGE_KEY) : null;
@@ -85,23 +122,10 @@ export function useMultiProject() {
         if (projectsRef.current.length >= MAX_COMPARE_PROJECTS) {
             return { success: false, error: `Maximum of ${MAX_COMPARE_PROJECTS} projects. Remove one first.` };
         }
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            return { success: false, error: 'File is not a valid compose document' };
-        }
-        if (!parsed.services || typeof parsed.services !== 'object' || Object.keys(parsed.services).length === 0) {
-            return { success: false, error: 'No services found in compose file' };
-        }
-        const content = toContent(parsed);
-        const newProject = {
-            id: generateId(),
-            name: parsed.name || String(fileName).replace(/\.ya?ml$/i, '') || 'Untitled',
-            fileName: /\.ya?ml$/i.test(fileName) ? fileName : 'docker-compose.yml',
-            content,
-            originalContent: content,
-            modified: false,
-        };
-        commit(prev => [...prev, newProject]);
-        return { success: true, project: newProject };
+        const result = createProject(parsed, fileName);
+        if (result.error) return { success: false, error: result.error };
+        commit(prev => [...prev, result.project]);
+        return { success: true, project: result.project };
     }, [commit]);
 
     /** Add a project from YAML text. */
@@ -117,6 +141,21 @@ export function useMultiProject() {
     const addProjectFromState = useCallback((state, fileName = 'editor-project.yml') => {
         return addParsedProject(JSON.parse(JSON.stringify(state || {})), fileName);
     }, [addParsedProject]);
+
+    /**
+     * Replace all projects with `{ name, fileName, yaml }` entries (e.g. the demo).
+     * Recorded as a single undo step.
+     */
+    const loadProjects = useCallback((entries) => {
+        try {
+            const next = createProjectsFromYaml(entries);
+            commit(next);
+            setDismissed([]);
+            return { success: true, projects: next };
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
+    }, [commit]);
 
     const removeProject = useCallback((projectId) => {
         commit(prev => prev.filter(p => p.id !== projectId));
@@ -176,6 +215,7 @@ export function useMultiProject() {
         projects,
         addProject,
         addProjectFromState,
+        loadProjects,
         removeProject,
         updateProject,
         renameProject,
@@ -190,4 +230,24 @@ export function useMultiProject() {
         toggleDismissed,
         maxProjects: MAX_COMPARE_PROJECTS,
     };
+}
+
+/**
+ * Pre-populate Compare mode before it mounts (e.g. from the What's New modal).
+ * useMultiProject reads storage on mount, so this only takes effect while
+ * Compare mode is not open. Existing compare projects are never overwritten.
+ *
+ * @param {Array<{ name: string, fileName: string, yaml: string }>} entries
+ * @returns {{ seeded: boolean, reason?: 'existing' | 'error', error?: string }}
+ */
+export function seedCompareProjects(entries) {
+    const existing = loadPersisted();
+    if (existing && existing.projects.length > 0) return { seeded: false, reason: 'existing' };
+    try {
+        const projects = createProjectsFromYaml(entries);
+        localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify({ projects, dismissed: [] }));
+        return { seeded: true };
+    } catch (e) {
+        return { seeded: false, reason: 'error', error: e.message };
+    }
 }
